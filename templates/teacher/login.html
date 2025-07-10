@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}教員ログイン{% endblock %}
+
+{% block content %}
+<div class="teacher-login">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="login-card">
+                    <div class="login-header text-center mb-4">
+                        <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
+                        <h3>教員ログイン</h3>
+                        <p class="text-muted">教員用システムへのアクセス</p>
+                    </div>
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST" class="login-form">
+                        <div class="mb-3">
+                            <label for="teacher_id" class="form-label">
+                                <i class="fas fa-user me-2"></i>教員ID
+                            </label>
+                            <input type="text" class="form-control" id="teacher_id" name="teacher_id" 
+                                   placeholder="教員IDを入力" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label">
+                                <i class="fas fa-lock me-2"></i>パスワード
+                            </label>
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   placeholder="パスワードを入力" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100 mb-3">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            ログイン
+                        </button>
+                    </form>
+                    
+                    <div class="login-info">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle me-2"></i>デモ用アカウント</h6>
+                            <small>
+                                <strong>ID:</strong> teacher <strong>パスワード:</strong> science2025<br>
+                                <strong>ID:</strong> admin <strong>パスワード:</strong> admin123
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-2"></i>
+                            学習システムに戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// エンターキーでフォーム送信
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.login-form');
+    const inputs = form.querySelectorAll('input');
+    
+    inputs.forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                form.submit();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

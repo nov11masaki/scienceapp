@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}考察をまとめよう{% endblock %}
+
+{% block content %}
+<div class="reflection-page">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="reflection-header text-center mb-4">
+                    <h2 class="mb-3">
+                        <i class="fas fa-lightbulb text-primary"></i>
+                        考察をまとめよう
+                    </h2>
+                    <div class="unit-display">
+                        <span class="badge bg-primary fs-6">{{ unit }}</span>
+                    </div>
+                </div>
+                
+                <div class="prediction-review mb-4">
+                    <div class="review-card">
+                        <h5 class="review-title">
+                            <i class="fas fa-brain"></i>
+                            あなたの予想
+                        </h5>
+                        <p class="review-content">{{ prediction_summary or '予想が記録されていません。' }}</p>
+                    </div>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="chat-messages" id="reflectionMessages">
+                        <div class="message ai-message">
+                            <div class="message-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                実験お疲れさまでした！実験の結果はどうでしたか？具体的に教えてください。
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-section">
+                        <!-- 選択肢ボタン -->
+                        <div class="suggestions-container" id="suggestionsContainer" style="display: none;">
+                            <div class="suggestions-header">
+                                <div class="suggestions-label">
+                                    <i class="fas fa-magic text-warning"></i>
+                                    <small class="text-muted">AIからの提案</small>
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm" id="regenerateSuggestions" title="選択肢を再生成">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+                            <div class="suggestions-buttons" id="suggestionsButtons">
+                                <!-- 選択肢ボタンがここに追加されます -->
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="reflectionInput" placeholder="実験結果を入力してください...">
+                            <button class="btn btn-primary" id="sendReflectionButton">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" id="suggestionsToggle" title="AIからの提案を表示">
+                                <i class="fas fa-magic"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons text-center mt-4">
+                    <button class="btn btn-success" id="finalSummaryButton" style="display: none;">
+                        <i class="fas fa-file-alt me-2"></i>
+                        考察をまとめる
+                    </button>
+                </div>
+                
+                <div class="final-summary-section" id="finalSummarySection" style="display: none;">
+                    <div class="final-summary-card">
+                        <h5 class="final-summary-title">
+                            <i class="fas fa-graduation-cap"></i>
+                            最終考察
+                        </h5>
+                        <div class="final-summary-content" id="finalSummaryContent"></div>
+                        <div class="text-center mt-3">
+                            <a href="/" class="btn btn-primary">
+                                <i class="fas fa-home me-2"></i>
+                                ホームに戻る
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let reflectionCount = 0;
+let usedSuggestion = false; // 選択肢を使用したかのフラグ
+let suggestionIndex = null; // 使用した選択肢のインデックス
+let suggestionsVisible = false;
+
+// ページ読み込み時の初期化
+document.addEventListener('DOMContentLoaded', function() {
+    // 最初の選択肢を自動表示
+    setTimeout(() => {
+        loadSuggestions();
+    }, 1000);
+    
+    // 再生成ボタンのクリックイベント
+    const regenerateBtn = document.getElementById('regenerateSuggestions');
+    if (regenerateBtn) {
+        regenerateBtn.addEventListener('click', function() {
+            loadSuggestions(true); // 再生成フラグを立てて実行
+        });
+    }
+});
+
+document.getElementById('sendReflectionButton').addEventListener('click', sendReflection);
+document.getElementById('reflectionInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendReflection();
+    }
+});
+
+document.getElementById('finalSummaryButton').addEventListener('click', getFinalSummary);
+document.getElementById('suggestionsToggle').addEventListener('click', toggleSuggestions);
+
+function sendReflection() {
+    const input = document.getElementById('reflectionInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // ユーザーメッセージを表示
+    addReflectionMessage(message, 'user');
+    input.value = '';
+    
+    // 送信ボタンを無効化
+    document.getElementById('sendReflectionButton').disabled = true;
+    
+    // 選択肢を非表示にする
+    hideSuggestions();
+    
+    // APIリクエストデータ
+    const requestData = { 
+        message: message,
+        used_suggestion: usedSuggestion,
+        suggestion_index: suggestionIndex
+    };
+    
+    // AIの応答を取得
+    fetch('/reflect_chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            addReflectionMessage('エラーが発生しました: ' + data.error, 'ai');
+        } else {
+            addReflectionMessage(data.response, 'ai');
+            reflectionCount++;
+            
+            // AI応答後に選択肢を取得して表示
+            loadSuggestions();
+            
+            // 十分な対話が行われた場合、まとめボタンを表示
+            if (reflectionCount >= 3) {
+                document.getElementById('finalSummaryButton').style.display = 'block';
+            }
+        }
+        
+        // 送信ボタンを有効化
+        document.getElementById('sendReflectionButton').disabled = false;
+        
+        // フラグをリセット
+        usedSuggestion = false;
+        suggestionIndex = null;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        addReflectionMessage('通信エラーが発生しました。', 'ai');
+        document.getElementById('sendReflectionButton').disabled = false;
+    });
+}
+
+function addReflectionMessage(content, type) {
+    const messagesContainer = document.getElementById('reflectionMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}-message`;
+    
+    const avatar = type === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            ${avatar}
+        </div>
+        <div class="message-content">
+            ${content}
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function getFinalSummary() {
+    document.getElementById('finalSummaryButton').disabled = true;
+    
+    fetch('/final_summary', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラーが発生しました: ' + data.error);
+        } else {
+            document.getElementById('finalSummaryContent').textContent = data.summary;
+            document.getElementById('finalSummarySection').style.display = 'block';
+            document.getElementById('finalSummaryButton').style.display = 'none';
+        }
+        document.getElementById('finalSummaryButton').disabled = false;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('通信エラーが発生しました。');
+        document.getElementById('finalSummaryButton').disabled = false;
+    });
+}
+
+// 選択肢関連の関数
+function toggleSuggestions() {
+    if (suggestionsVisible) {
+        hideSuggestions();
+    } else {
+        loadSuggestions();
+    }
+}
+
+function loadSuggestions(isRegenerate = false) {
+    // 選択肢を読み込み中表示
+    const container = document.getElementById('suggestionsContainer');
+    const buttonsDiv = document.getElementById('suggestionsButtons');
+    const regenerateBtn = document.getElementById('regenerateSuggestions');
+    
+    if (isRegenerate) {
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted">AIが新しい提案を考え中...</small></div>';
+        regenerateBtn.disabled = true;
+        regenerateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    } else {
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted">AIが提案を考え中...</small></div>';
+    }
+    
+    container.style.display = 'block';
+    suggestionsVisible = true;
+    
+    fetch('/reflection/suggestions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            regenerate: isRegenerate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        displaySuggestions(data.suggestions, data.regenerated);
+        if (isRegenerate) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+        }
+    })
+    .catch(error => {
+        console.error('選択肢取得エラー:', error);
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted text-danger">提案の取得に失敗しました</small></div>';
+        if (isRegenerate) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+        }
+    });
+}
+
+function displaySuggestions(suggestions, wasRegenerated = false) {
+    const buttonsDiv = document.getElementById('suggestionsButtons');
+    buttonsDiv.innerHTML = '';
+    
+    // 再生成ラベルを表示
+    if (wasRegenerated) {
+        const regeneratedLabel = document.createElement('div');
+        regeneratedLabel.className = 'text-center mb-2';
+        regeneratedLabel.innerHTML = '<small class="text-success"><i class="fas fa-sparkles"></i> 新しい提案</small>';
+        buttonsDiv.appendChild(regeneratedLabel);
+    }
+    
+    suggestions.forEach((suggestion, index) => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-outline-primary btn-sm suggestion-btn';
+        button.setAttribute('data-index', index + 1);
+        
+        // アイコンを追加（内容に応じて）
+        let icon = '🔬';
+        if (suggestion.includes('予想') || suggestion.includes('同じ') || suggestion.includes('違')) {
+            icon = '📊';
+        } else if (suggestion.includes('大きく') || suggestion.includes('小さく')) {
+            icon = '📏';
+        } else if (suggestion.includes('日常') || suggestion.includes('タイヤ') || suggestion.includes('風船')) {
+            icon = '🌟';
+        } else if (suggestion.includes('理由') || suggestion.includes('なぜ')) {
+            icon = '🤔';
+        }
+        
+        button.innerHTML = `<span class="suggestion-icon">${icon}</span>${suggestion}`;
+        button.onclick = () => selectSuggestion(suggestion, index + 1);
+        buttonsDiv.appendChild(button);
+    });
+}
+
+function selectSuggestion(suggestion, index) {
+    // 選択した内容をメッセージとして送信
+    document.getElementById('reflectionInput').value = suggestion;
+    
+    // 選択肢使用情報を記録
+    usedSuggestion = true;
+    suggestionIndex = index;
+    
+    sendReflection();
+}
+
+function hideSuggestions() {
+    document.getElementById('suggestionsContainer').style.display = 'none';
+    suggestionsVisible = false;
+}
+</script>
+{% endblock %}

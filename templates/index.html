@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}理科学習支援システム - ホーム{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1 class="display-4 mb-4">
+            <i class="fas fa-flask text-primary"></i>
+            理科学習支援システム
+        </h1>
+        <p class="lead mb-5">予想と考察を通して理科の学習を深めよう！</p>
+        <div class="hero-buttons">
+            <a href="/select_number" class="btn btn-primary btn-lg px-5 py-3 me-3">
+                <i class="fas fa-play me-2"></i>
+                学習を始める
+            </a>
+            <a href="/resume_session" class="btn btn-outline-light btn-lg px-5 py-3">
+                <i class="fas fa-history me-2"></i>
+                続きから始める
+            </a>
+        </div>
+        <div class="mt-3">
+            <a href="/teacher/login" class="btn btn-outline-light">
+                <i class="fas fa-chalkboard-teacher me-2"></i>
+                教員用ページ
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-card">
+                    <i class="fas fa-brain feature-icon"></i>
+                    <h4>予想を立てる</h4>
+                    <p>AIとの対話を通して、根拠のある予想を立てます</p>
+                </div>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-card">
+                    <i class="fas fa-microscope feature-icon"></i>
+                    <h4>実験を行う</h4>
+                    <p>実際に実験を行い、結果を観察します</p>
+                </div>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="feature-card">
+                    <i class="fas fa-lightbulb feature-icon"></i>
+                    <h4>考察をまとめる</h4>
+                    <p>結果と予想を比較し、学びを深めます</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

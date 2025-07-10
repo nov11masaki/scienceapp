@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}学習分析ダッシュボード{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard">
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-chart-line me-3"></i>学習分析ダッシュボード</h1>
+                <div class="teacher-info">
+                    <span class="badge bg-primary me-2"><i class="fas fa-user"></i> {{ teacher_id }}</span>
+                    <a href="{{ url_for('teacher_logout') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                    </a>
+                </div>
+            </div>
+            
+            <!-- ナビゲーション -->
+            <div class="mb-4">
+                <a href="{{ url_for('teacher') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-home"></i> ダッシュボード
+                </a>
+                <a href="{{ url_for('teacher_logs') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-list"></i> ログ一覧
+                </a>
+                <button class="btn btn-primary">
+                    <i class="fas fa-chart-line"></i> 学習分析
+                </button>
+            </div>
+        </div>
+
+        <!-- フィルター -->
+        <div class="filters-section">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">日付</label>
+                    <input type="date" name="date" class="form-control" 
+                           value="{{ request.args.get('date', '') }}" onchange="this.form.submit()">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">単元</label>
+                    <select name="unit" class="form-select" onchange="this.form.submit()">
+                        <option value="">全単元</option>
+                        {% for unit in units %}
+                        <option value="{{ unit }}" {% if current_unit == unit %}selected{% endif %}>
+                            {{ unit }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> 分析更新
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="refreshAnalysis()">
+                        <i class="fas fa-sync-alt"></i> 再分析
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- クラス全体の分析結果 -->
+        <div class="analysis-results">
+            <div class="row">
+                <!-- 全体傾向 -->
+                <div class="col-md-8">
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-users me-2"></i>クラス全体の学習傾向</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="trend-summary">
+                                <p class="lead">{{ class_analysis.overall_trend }}</p>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-exclamation-triangle text-warning me-2"></i>よくある誤解</h5>
+                                    <ul class="list-group list-group-flush">
+                                        {% for misconception in class_analysis.common_misconceptions %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-chevron-right text-warning me-2"></i>{{ misconception }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5><i class="fas fa-lightbulb text-success me-2"></i>効果的だった指導法</h5>
+                                    <ul class="list-group list-group-flush">
+                                        {% for approach in class_analysis.effective_approaches %}
+                                        <li class="list-group-item">
+                                            <i class="fas fa-check text-success me-2"></i>{{ approach }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 指標 -->
+                <div class="col-md-4">
+                    <div class="metrics-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-gauge-high me-2"></i>学習指標</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric-item">
+                                <div class="metric-label">取り組み度</div>
+                                <div class="metric-value engagement-{{ class_analysis.engagement_level }}">
+                                    {{ class_analysis.engagement_level }}
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">理解度分布</div>
+                                <div class="metric-description">
+                                    {{ class_analysis.understanding_distribution }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 指導提案 -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="recommendations-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-compass me-2"></i>今後の指導提案</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for recommendation in class_analysis.recommendations %}
+                                <li class="list-group-item">
+                                    <i class="fas fa-arrow-right text-primary me-2"></i>{{ recommendation }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="improvement-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-target me-2"></i>重点指導分野</h3>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for area in class_analysis.improvement_areas %}
+                                <li class="list-group-item">
+                                    <i class="fas fa-bullseye text-danger me-2"></i>{{ area }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 個別学生分析リンク -->
+        <div class="individual-analysis mt-5">
+            <h3><i class="fas fa-user-graduate me-2"></i>個別学生分析</h3>
+            {% if unit_students %}
+                {% for unit_name, students in unit_students.items() %}
+                <div class="unit-section mb-4">
+                    <h5 class="unit-header">{{ unit_name }}</h5>
+                    <div class="students-grid">
+                        {% for student in students %}
+                        <a href="{{ url_for('teacher_student_analysis', student=student, unit=unit_name, date=current_date) }}" 
+                           class="student-analysis-link">
+                            <i class="fas fa-user me-2"></i>{{ student }}番
+                            <i class="fas fa-chart-bar ms-auto"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    分析対象となる学習データがありません。
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshAnalysis() {
+    // 再分析ボタンの処理
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 分析中...';
+    btn.disabled = true;
+    
+    // ページをリロードして再分析
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+</script>
+
+<style>
+.analysis-card, .metrics-card, .recommendations-card, .improvement-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    color: white;
+    border-radius: 12px 12px 0 0 !important;
+    padding: 15px 20px;
+    border: none;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.trend-summary {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.metric-item {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.metric-label {
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.engagement-高 { background: #d4edda; color: #155724; }
+.engagement-中 { background: #fff3cd; color: #856404; }
+.engagement-低 { background: #f8d7da; color: #721c24; }
+
+.metric-description {
+    font-size: 0.9rem;
+    color: #666;
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+.unit-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.unit-header {
+    color: var(--primary-color);
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.students-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.student-analysis-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    background: white;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #333;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.student-analysis-link:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    color: var(--primary-color);
+}
+</style>
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}学習ログ一覧{% endblock %}
+
+{% block content %}
+<div class="teacher-logs">
+    <div class="container">
+        <div class="logs-header mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="mb-0">
+                    <i class="fas fa-clipboard-list text-primary"></i>
+                    学習ログ一覧
+                </h2>
+                <div class="teacher-info">
+                    <span class="badge bg-success me-2">{{ teacher_id }}</span>
+                    <a href="/teacher/logout" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt me-1"></i>ログアウト
+                    </a>
+                </div>
+            </div>
+            
+            <!-- フィルター -->
+            <div class="filters-section mb-4">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">日付</label>
+                        <input type="date" class="form-control" id="dateFilter" 
+                               value="{{ current_date[:4] }}-{{ current_date[4:6] }}-{{ current_date[6:8] }}"
+                               onchange="applyFilters()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">単元</label>
+                        <select class="form-select" id="unitFilter" onchange="applyFilters()">
+                            <option value="">すべての単元</option>
+                            {% for unit in units %}
+                            <option value="{{ unit }}" {% if current_unit == unit %}selected{% endif %}>
+                                {{ unit }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">出席番号</label>
+                        <input type="number" class="form-control" id="studentFilter" 
+                               placeholder="出席番号" min="1" max="30"
+                               value="{{ current_student }}" onchange="applyFilters()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div>
+                            <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                                <i class="fas fa-eraser me-2"></i>クリア
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 学生データ表示 -->
+        {% if students_data %}
+        <div class="students-grid">
+            {% for student_number, student_data in students_data.items() %}
+            <div class="student-card">
+                <div class="student-header">
+                    <h4>
+                        <i class="fas fa-user-graduate"></i>
+                        {{ student_number }}番
+                    </h4>
+                </div>
+                
+                <div class="units-list">
+                    {% for unit_name, unit_data in student_data.units.items() %}
+                    <div class="unit-item">
+                        <div class="unit-header">
+                            <h6 class="unit-name">{{ unit_name }}</h6>
+                            <div class="progress-indicators">
+                                {% if unit_data.prediction_chats %}
+                                    <span class="badge bg-info" title="予想対話">
+                                        <i class="fas fa-comments"></i> {{ unit_data.prediction_chats|length }}
+                                    </span>
+                                {% endif %}
+                                {% if unit_data.prediction_summary %}
+                                    <span class="badge bg-primary" title="予想まとめ">
+                                        <i class="fas fa-brain"></i>
+                                    </span>
+                                {% endif %}
+                                {% if unit_data.reflection_chats %}
+                                    <span class="badge bg-warning" title="考察対話">
+                                        <i class="fas fa-lightbulb"></i> {{ unit_data.reflection_chats|length }}
+                                    </span>
+                                {% endif %}
+                                {% if unit_data.final_summary %}
+                                    <span class="badge bg-success" title="最終考察">
+                                        <i class="fas fa-check"></i>
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="unit-actions">
+                            <a href="/teacher/student/{{ student_number }}?unit={{ unit_name|urlencode }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> 詳細
+                            </a>
+                        </div>
+                        
+                        <!-- 予想まとめがある場合は表示 -->
+                        {% if unit_data.prediction_summary %}
+                        <div class="summary-preview">
+                            <small class="text-muted">予想:</small>
+                            <p class="mb-1">{{ unit_data.prediction_summary.data.summary[:100] }}
+                            {% if unit_data.prediction_summary.data.summary|length > 100 %}...{% endif %}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- 最終考察がある場合は表示 -->
+                        {% if unit_data.final_summary %}
+                        <div class="summary-preview">
+                            <small class="text-muted">考察:</small>
+                            <p class="mb-0">{{ unit_data.final_summary.data.final_summary[:100] }}
+                            {% if unit_data.final_summary.data.final_summary|length > 100 %}...{% endif %}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">データが見つかりません</h4>
+            <p class="text-muted">指定した条件に一致する学習ログがありません。</p>
+        </div>
+        {% endif %}
+        
+        <div class="text-center mt-5">
+            <a href="/teacher" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left me-2"></i>ダッシュボードに戻る
+            </a>
+            <button class="btn btn-success" onclick="exportCurrentData()">
+                <i class="fas fa-download me-2"></i>現在の表示をエクスポート
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyFilters() {
+    const date = document.getElementById('dateFilter').value.replace(/-/g, '');
+    const unit = document.getElementById('unitFilter').value;
+    const student = document.getElementById('studentFilter').value;
+    
+    let url = '/teacher/logs?';
+    const params = [];
+    
+    if (date) params.push(`date=${date}`);
+    if (unit) params.push(`unit=${encodeURIComponent(unit)}`);
+    if (student) params.push(`student=${student}`);
+    
+    url += params.join('&');
+    window.location.href = url;
+}
+
+function clearFilters() {
+    document.getElementById('dateFilter').value = new Date().toISOString().slice(0,10);
+    document.getElementById('unitFilter').value = '';
+    document.getElementById('studentFilter').value = '';
+    applyFilters();
+}
+
+function exportCurrentData() {
+    const date = document.getElementById('dateFilter').value.replace(/-/g, '');
+    fetch(`/teacher/export?date=${date}`)
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('エクスポート中にエラーが発生しました。');
+    });
+}
+</script>
+{% endblock %}

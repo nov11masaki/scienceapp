@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}実験を行おう{% endblock %}
+
+{% block content %}
+<div class="experiment-page">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="text-center mb-5">
+                    <h2 class="mb-3">
+                        <i class="fas fa-flask text-primary"></i>
+                        実験を行おう
+                    </h2>
+                    <p class="text-muted">予想を立てたら、実際に実験を行ってみましょう</p>
+                </div>
+                
+                <div class="experiment-card">
+                    <div class="experiment-icon">
+                        <i class="fas fa-microscope"></i>
+                    </div>
+                    
+                    <h4 class="text-center mb-4">実験を実施してください</h4>
+                    
+                    <div class="experiment-instructions">
+                        <p class="text-center mb-4">
+                            先生の指示に従って実験を行い、<br>
+                            結果を観察してください。
+                        </p>
+                        
+                        <div class="experiment-status">
+                            <div class="status-item">
+                                <i class="fas fa-clock text-warning"></i>
+                                <span>実験中...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-5">
+                        <button class="btn btn-success btn-lg px-5 py-3" id="completeButton">
+                            <i class="fas fa-check me-2"></i>
+                            実験が完了しました
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="/prediction" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>
+                        予想に戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('completeButton').addEventListener('click', function() {
+    // ボタンを無効化
+    this.disabled = true;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>結果を送信中...';
+    
+    // 少し待ってから次のページに移動
+    setTimeout(() => {
+        window.location.href = '/reflection';
+    }, 1000);
+});
+</script>
+{% endblock %}

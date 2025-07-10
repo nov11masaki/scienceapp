@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}予想を立てよう{% endblock %}
+
+{% block content %}
+<div class="chat-page">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="chat-header text-center mb-4">
+                    <h2 class="mb-3">
+                        <i class="fas fa-brain text-primary"></i>
+                        予想を立てよう
+                    </h2>
+                    <div class="unit-display">
+                        <span class="badge bg-primary fs-6">{{ unit }}</span>
+                    </div>
+                </div>
+                
+                <div class="task-section mb-4">
+                    <div class="task-card">
+                        <h5 class="task-title">
+                            <i class="fas fa-clipboard-list"></i>
+                            課題
+                        </h5>
+                        <p class="task-content">{{ task_content }}</p>
+                    </div>
+                </div>
+                
+                <div class="chat-container">
+                    <div class="api-status" id="apiStatus" style="display: none;">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span id="apiStatusMessage">AI接続を確認中...</span>
+                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="testApiConnection()">
+                                <i class="fas fa-sync"></i> 再テスト
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message ai-message">
+                            <div class="message-avatar">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                こんにちは！この課題について、どのような結果になると思いますか？あなたの考えを聞かせてください。
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-section">
+                        <!-- 選択肢ボタン -->
+                        <div class="suggestions-container" id="suggestionsContainer" style="display: none;">
+                            <div class="suggestions-header">
+                                <div class="suggestions-label">
+                                    <i class="fas fa-magic text-warning"></i>
+                                    <small class="text-muted">AIからの提案</small>
+                                </div>
+                                <button class="btn btn-outline-secondary btn-sm" id="regenerateSuggestions" title="選択肢を再生成">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+                            <div class="suggestions-buttons" id="suggestionsButtons">
+                                <!-- 選択肢ボタンがここに追加されます -->
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="messageInput" placeholder="あなたの考えを入力してください...">
+                            <button class="btn btn-primary" id="sendButton">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" id="suggestionsToggle" title="AIからの提案を表示">
+                                <i class="fas fa-magic"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons text-center mt-4">
+                    <button class="btn btn-success" id="summaryButton" style="display: none;">
+                        <i class="fas fa-check me-2"></i>
+                        予想をまとめる
+                    </button>
+                </div>
+                
+                <div class="summary-section" id="summarySection" style="display: none;">
+                    <div class="summary-card">
+                        <h5 class="summary-title">
+                            <i class="fas fa-lightbulb"></i>
+                            あなたの予想
+                        </h5>
+                        <div class="summary-content" id="summaryContent"></div>
+                        <div class="text-center mt-3">
+                            <a href="/experiment" class="btn btn-primary">
+                                <i class="fas fa-flask me-2"></i>
+                                実験を始める
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let conversationCount = 0;
+let lastMessage = '';
+let usedSuggestion = false; // 選択肢を使用したかのフラグ
+let suggestionIndex = null; // 使用した選択肢のインデックス
+
+// ページ読み込み時にAPI接続をテスト
+document.addEventListener('DOMContentLoaded', function() {
+    testApiConnection();
+    // 最初の選択肢を自動表示
+    setTimeout(() => {
+        loadSuggestions();
+    }, 1000);
+});
+
+document.getElementById('sendButton').addEventListener('click', sendMessage);
+document.getElementById('messageInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
+
+document.getElementById('summaryButton').addEventListener('click', getSummary);
+document.getElementById('suggestionsToggle').addEventListener('click', toggleSuggestions);
+
+let suggestionsVisible = false;
+
+function testApiConnection() {
+    fetch('/api/test')
+    .then(response => response.json())
+    .then(data => {
+        const statusDiv = document.getElementById('apiStatus');
+        const messageSpan = document.getElementById('apiStatusMessage');
+        
+        if (data.status === 'success') {
+            statusDiv.style.display = 'none';
+            console.log('API接続テスト成功:', data.response);
+        } else {
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'alert alert-danger';
+            messageSpan.textContent = data.message || 'AI接続に問題があります';
+        }
+    })
+    .catch(error => {
+        console.error('API接続テストエラー:', error);
+        const statusDiv = document.getElementById('apiStatus');
+        const messageSpan = document.getElementById('apiStatusMessage');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'alert alert-danger';
+        messageSpan.textContent = 'ネットワーク接続に問題があります';
+    });
+}
+
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // ユーザーメッセージを表示
+    addMessage(message, 'user');
+    input.value = '';
+    
+    // APIに送信（選択肢情報を含む）
+    sendMessageToAPI(message, usedSuggestion, suggestionIndex);
+    
+    // フラグをリセット
+    usedSuggestion = false;
+    suggestionIndex = null;
+}
+
+function addMessage(content, type) {
+    const messagesContainer = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}-message`;
+    
+    const avatar = type === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            ${avatar}
+        </div>
+        <div class="message-content">
+            ${content}
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    return messageDiv; // 作成されたメッセージ要素を返す
+}
+
+function addRetryButton() {
+    const messagesContainer = document.getElementById('chatMessages');
+    const retryDiv = document.createElement('div');
+    retryDiv.className = 'message ai-message retry-message';
+    retryDiv.innerHTML = `
+        <div class="message-avatar">
+            <i class="fas fa-robot"></i>
+        </div>
+        <div class="message-content">
+            <button class="btn btn-outline-primary btn-sm" onclick="retryLastMessage()">
+                <i class="fas fa-redo me-2"></i>再試行
+            </button>
+        </div>
+    `;
+    messagesContainer.appendChild(retryDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function retryLastMessage() {
+    // 再試行ボタンを削除
+    const retryMessages = document.querySelectorAll('.retry-message');
+    retryMessages.forEach(msg => msg.remove());
+    
+    // 最後のユーザーメッセージを再送信
+    const userMessages = document.querySelectorAll('.user-message .message-content');
+    if (userMessages.length > 0) {
+        const lastMessage = userMessages[userMessages.length - 1].textContent;
+        // 直接APIを呼び出す
+        sendMessageToAPI(lastMessage);
+    }
+}
+
+function sendMessageToAPI(message, usedSugg = false, suggIndex = null) {
+    // 送信ボタンを無効化
+    document.getElementById('sendButton').disabled = true;
+    
+    // 読み込み中のメッセージを表示
+    const loadingMessage = addMessage('考え中...', 'ai');
+    loadingMessage.classList.add('loading-message');
+    
+    // 選択肢を非表示にする
+    hideSuggestions();
+    
+    // APIリクエストデータ
+    const requestData = { 
+        message: message,
+        used_suggestion: usedSugg,
+        suggestion_index: suggIndex
+    };
+    
+    // AIの応答を取得
+    fetch('/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => {
+        // 読み込み中メッセージを削除
+        const loadingMessages = document.querySelectorAll('.loading-message');
+        loadingMessages.forEach(msg => msg.remove());
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            addMessage('⚠️ ' + data.error, 'ai');
+            addRetryButton();
+        } else {
+            addMessage(data.response, 'ai');
+            conversationCount++;
+            
+            // AI応答後に選択肢を取得して表示
+            loadSuggestions();
+            
+            if (data.suggest_summary) {
+                document.getElementById('summaryButton').style.display = 'block';
+            }
+        }
+        
+        document.getElementById('sendButton').disabled = false;
+    })
+    .catch(error => {
+        // 読み込み中メッセージを削除
+        const loadingMessages = document.querySelectorAll('.loading-message');
+        loadingMessages.forEach(msg => msg.remove());
+        
+        console.error('通信エラー詳細:', error);
+        addMessage('⚠️ 通信エラーが発生しました。ネットワーク接続を確認してください。', 'ai');
+        addRetryButton();
+        document.getElementById('sendButton').disabled = false;
+        
+        // API接続テストを実行
+        testApiConnection();
+    });
+}
+
+function getSummary() {
+    document.getElementById('summaryButton').disabled = true;
+    
+    fetch('/summary', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラーが発生しました: ' + data.error);
+        } else {
+            document.getElementById('summaryContent').textContent = data.summary;
+            document.getElementById('summarySection').style.display = 'block';
+            document.getElementById('summaryButton').style.display = 'none';
+        }
+        document.getElementById('summaryButton').disabled = false;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('通信エラーが発生しました。');
+        document.getElementById('summaryButton').disabled = false;
+    });
+}
+
+// 選択肢関連の関数
+function toggleSuggestions() {
+    if (suggestionsVisible) {
+        hideSuggestions();
+    } else {
+        loadSuggestions();
+    }
+}
+
+function loadSuggestions(isRegenerate = false) {
+    // 選択肢を読み込み中表示
+    const container = document.getElementById('suggestionsContainer');
+    const buttonsDiv = document.getElementById('suggestionsButtons');
+    const regenerateBtn = document.getElementById('regenerateSuggestions');
+    
+    if (isRegenerate) {
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted">AIが新しい提案を考え中...</small></div>';
+        regenerateBtn.disabled = true;
+        regenerateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    } else {
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted">AIが提案を考え中...</small></div>';
+    }
+    
+    container.style.display = 'block';
+    suggestionsVisible = true;
+    
+    fetch('/chat/suggestions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            regenerate: isRegenerate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        displaySuggestions(data.suggestions, data.regenerated);
+        if (isRegenerate) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+        }
+    })
+    .catch(error => {
+        console.error('選択肢取得エラー:', error);
+        buttonsDiv.innerHTML = '<div class="text-center"><small class="text-muted text-danger">提案の取得に失敗しました</small></div>';
+        if (isRegenerate) {
+            regenerateBtn.disabled = false;
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+        }
+    });
+}
+
+function displaySuggestions(suggestions, wasRegenerated = false) {
+    const buttonsDiv = document.getElementById('suggestionsButtons');
+    buttonsDiv.innerHTML = '';
+    
+    // 再生成された場合の表示
+    if (wasRegenerated) {
+        const regeneratedLabel = document.createElement('div');
+        regeneratedLabel.className = 'text-center mb-2';
+        regeneratedLabel.innerHTML = '<small class="text-success"><i class="fas fa-sparkles"></i> 新しい提案</small>';
+        buttonsDiv.appendChild(regeneratedLabel);
+    }
+    
+    suggestions.forEach((suggestion, index) => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-outline-primary btn-sm suggestion-btn';
+        button.setAttribute('data-index', index + 1);
+        
+        // アイコンを追加（内容に応じて）
+        let icon = '💭';
+        if (suggestion.includes('理由') || suggestion.includes('なぜ')) {
+            icon = '🤔';
+        } else if (suggestion.includes('体験') || suggestion.includes('見た')) {
+            icon = '👀';
+        } else if (suggestion.includes('考え') || suggestion.includes('思う')) {
+            icon = '💡';
+        }
+        
+        button.innerHTML = `<span class="suggestion-icon">${icon}</span>${suggestion}`;
+        button.onclick = () => selectSuggestion(suggestion, index + 1);
+        buttonsDiv.appendChild(button);
+    });
+}
+
+// 再生成ボタンのイベントリスナーを追加
+document.addEventListener('DOMContentLoaded', function() {
+    // 既存の初期化処理...
+    
+    // 再生成ボタンのクリックイベント
+    const regenerateBtn = document.getElementById('regenerateSuggestions');
+    if (regenerateBtn) {
+        regenerateBtn.addEventListener('click', function() {
+            loadSuggestions(true); // 再生成フラグを立てて実行
+        });
+    }
+});
+
+function selectSuggestion(suggestion, index) {
+    // 選択した内容をメッセージとして送信
+    document.getElementById('messageInput').value = suggestion;
+    
+    // 選択肢使用情報を記録
+    usedSuggestion = true;
+    suggestionIndex = index;
+    
+    sendMessage();
+}
+
+function hideSuggestions() {
+    document.getElementById('suggestionsContainer').style.display = 'none';
+    suggestionsVisible = false;
+}
+</script>
+{% endblock %}

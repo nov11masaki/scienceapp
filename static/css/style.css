@@ -1,0 +1,1399 @@
+/* メインカラー */
+:root {
+    --primary-color: #4a90e2;
+    --secondary-color: #f39c12;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f1c40f;
+    --info-color: #3498db;
+    --light-color: #ecf0f1;
+    --light-bg: #f8f9fa;
+    --dark-color: #2c3e50;
+    --border-color: #dee2e6;
+    --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 基本設定 */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--gradient-bg);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* ホームページ - 1ページに収める */
+.hero-section {
+    height: 100vh;
+    max-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+    padding: 20px 0;
+    box-sizing: border-box;
+}
+
+.hero-section h1 {
+    font-weight: 700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    font-size: 3rem;
+    margin-bottom: 20px;
+}
+
+.hero-section .lead {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin-bottom: 30px;
+}
+
+.features-section {
+    display: none; /* デスクトップでは非表示にして1ページに収める */
+}
+
+/* 選択ページ - 1ページに収める */
+.selection-page {
+    height: 100vh;
+    padding: 30px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.selection-page .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 30px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* 出席番号カード - コンパクト化 */
+.number-card {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    color: white;
+    border-radius: 12px;
+    padding: 20px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.number-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+
+.number-card.active {
+    background: linear-gradient(135deg, var(--success-color), #27ae60);
+    transform: scale(1.05);
+}
+
+.number-display {
+    font-size: 2rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.number-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* 単元カード - コンパクト化 */
+.unit-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 2px solid transparent;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.unit-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-color);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.unit-card.active {
+    background: var(--primary-color);
+    color: white;
+    transform: translateY(-5px) scale(1.02);
+}
+
+.unit-icon {
+    font-size: 2.5rem;
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+}
+
+.unit-card.active .unit-icon {
+    color: white;
+}
+
+.unit-title {
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* チャットページ - 1ページに収める */
+.chat-page {
+    height: 100vh;
+    padding: 20px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.chat-page .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 20px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: 95vh;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header h2 {
+    color: #333;
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+}
+
+.unit-display .badge {
+    padding: 8px 16px;
+}
+
+/* 課題セクション - コンパクト化 */
+.task-card {
+    background: linear-gradient(135deg, #fff, #f8f9fa);
+    border-left: 4px solid var(--primary-color);
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.task-title {
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.task-content {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* チャットコンテナ - 高さ調整 */
+.chat-container {
+    background: #f8f9fa;
+    border-radius: 15px;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.chat-messages {
+    height: 300px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 15px;
+    background: white;
+    flex: 1;
+}
+
+.message {
+    display: flex;
+    margin-bottom: 15px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.ai-message .message-avatar {
+    background: var(--primary-color);
+    color: white;
+}
+
+.user-message {
+    flex-direction: row-reverse;
+}
+
+.user-message .message-avatar {
+    background: var(--success-color);
+    color: white;
+    margin-right: 0;
+    margin-left: 12px;
+}
+
+.message-content {
+    background: #f1f3f4;
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 70%;
+    line-height: 1.4;
+    font-size: 0.9rem;
+}
+
+.user-message .message-content {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* 読み込み中メッセージ */
+.loading-message .message-content {
+    background: #f8f9fa;
+    color: #6c757d;
+    font-style: italic;
+    animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from { opacity: 0.6; }
+    to { opacity: 1; }
+}
+
+/* API状態表示 */
+.api-status {
+    margin-bottom: 10px;
+}
+
+.api-status .alert {
+    margin: 0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+}
+
+/* 選択肢機能のスタイリング */
+.suggestions-container {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.suggestions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.suggestions-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0;
+}
+
+#regenerateSuggestions {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+#regenerateSuggestions:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: rotate(180deg);
+}
+
+.suggestions-buttons {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    margin-top: 10px !important;
+}
+
+.suggestion-btn {
+    /* Bootstrapの設定をリセット */
+    border: none !important;
+    background: white !important;
+    color: var(--primary-color) !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    line-height: 1.5 !important;
+    
+    /* カスタムスタイル */
+    border-radius: 12px !important;
+    padding: 16px 50px 16px 20px !important;
+    margin: 0 0 10px 0 !important;
+    width: 100% !important;
+    text-align: left !important;
+    position: relative !important;
+    
+    /* 表示の改善 */
+    display: block !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    min-height: 60px !important;
+    
+    /* 視覚効果 */
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.15) !important;
+    border: 2px solid var(--primary-color) !important;
+    transition: all 0.2s ease !important;
+    
+    /* テキストのレンダリング改善 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.suggestion-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s;
+}
+
+.suggestion-btn:hover {
+    background: var(--primary-color) !important;
+    color: white !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.3) !important;
+}
+
+.suggestion-btn:hover::before {
+    left: 100%;
+}
+
+.suggestion-btn:active {
+    transform: translateY(0) !important;
+}
+
+.suggestion-btn .suggestion-icon {
+    margin-right: 8px !important;
+    font-size: 0.9rem !important;
+    opacity: 0.8 !important;
+}
+
+/* 選択肢の番号表示 */
+.suggestion-btn::after {
+    content: attr(data-index) !important;
+    position: absolute !important;
+    right: 15px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 24px !important;
+    height: 24px !important;
+    background: rgba(74, 144, 226, 0.1) !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.75rem !important;
+    font-weight: bold !important;
+    color: var(--primary-color) !important;
+    flex-shrink: 0 !important;
+}
+
+.suggestion-btn:hover::after {
+    background: rgba(255,255,255,0.3) !important;
+    color: white !important;
+}
+
+/* チャット入力 - コンパクト化 */
+.chat-input-section {
+    padding: 15px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    flex-shrink: 0;
+}
+
+.chat-input-section .form-control {
+    border-radius: 20px;
+    border: 2px solid #e9ecef;
+    padding: 8px 15px;
+    font-size: 0.9rem;
+}
+
+.chat-input-section .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+.chat-input-section .btn {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 選択肢トグルボタンのスタイル */
+#suggestionsToggle {
+    border-left: none;
+}
+
+#suggestionsToggle:hover {
+    background: var(--warning-color);
+    border-color: var(--warning-color);
+    color: white;
+}
+
+/* まとめセクション - コンパクト化 */
+.summary-card, .review-card, .final-summary-card {
+    background: linear-gradient(135deg, var(--success-color), #27ae60);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.summary-title, .review-title, .final-summary-title {
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.summary-content, .review-content, .final-summary-content {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+/* 実験ページ - 1ページに収める */
+.experiment-page {
+    height: 100vh;
+    padding: 30px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.experiment-page .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 30px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.experiment-card {
+    background: linear-gradient(135deg, #fff, #f8f9fa);
+    border-radius: 20px;
+    padding: 40px 30px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.experiment-icon {
+    font-size: 4rem;
+    color: var(--secondary-color);
+    margin-bottom: 25px;
+}
+
+.experiment-instructions {
+    margin: 30px 0;
+}
+
+.experiment-status {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 25px auto;
+    max-width: 280px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* 反省ページ - 1ページに収める */
+.reflection-page {
+    height: 100vh;
+    padding: 20px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.reflection-page .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 20px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: 95vh;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.review-card {
+    background: linear-gradient(135deg, var(--info-color), #2980b9);
+}
+
+/* ボタンスタイル - コンパクト化 */
+.btn {
+    border-radius: 20px;
+    padding: 10px 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    font-size: 0.9rem;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.btn-lg {
+    padding: 12px 30px;
+    font-size: 1rem;
+}
+
+/* 教員用スタイル - コンパクト化 */
+.teacher-dashboard {
+    height: 100vh;
+    padding: 30px 0;
+    background: var(--gradient-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.teacher-dashboard .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 30px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.dashboard-header h1 {
+    color: #333;
+    font-size: 2rem;
+    margin-bottom: 20px;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-3px);
+}
+
+/* AI学習分析カードの強調スタイル */
+.dashboard-card.featured-card {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+    border: 2px solid var(--warning-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-card.featured-card::before {
+    content: "NEW";
+    position: absolute;
+    top: 10px;
+    right: -30px;
+    background: var(--danger-color);
+    color: white;
+    padding: 5px 35px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    transform: rotate(45deg);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.dashboard-card.featured-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.dashboard-card.featured-card .card-icon {
+    color: var(--warning-color);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.dashboard-card .card-icon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.filter-card {
+    display: block;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    text-decoration: none;
+    color: #333;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.filter-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    color: var(--primary-color);
+}
+
+.filter-icon {
+    font-size: 1.5rem;
+    color: var(--secondary-color);
+    margin-bottom: 8px;
+}
+
+.filter-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* ログページ - 1ページに収める */
+.teacher-logs {
+    height: 100vh;
+    padding: 20px 0;
+    background: var(--gradient-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.teacher-logs .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 25px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: 95vh;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.filters-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+}
+
+.students-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 15px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.student-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+    height: fit-content;
+}
+
+.student-header h4 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.unit-item {
+    border-left: 3px solid var(--primary-color);
+    background: #f8f9fa;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 0 8px 8px 0;
+}
+
+.unit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.unit-name {
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.progress-indicators {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.progress-indicators .badge {
+    font-size: 0.65rem;
+    padding: 3px 6px;
+}
+
+.unit-actions {
+    margin-bottom: 8px;
+}
+
+.summary-preview {
+    background: rgba(255,255,255,0.8);
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.summary-preview p {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    margin: 0;
+}
+
+/* 学生詳細ページ - 1ページに収める */
+.student-detail {
+    height: 100vh;
+    padding: 20px 0;
+    background: var(--gradient-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.student-detail .container {
+    background: rgba(255,255,255,0.95);
+    border-radius: 20px;
+    padding: 25px;
+    color: #333;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    height: 95vh;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.learning-timeline {
+    position: relative;
+    padding-left: 25px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.learning-timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--primary-color);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -18px;
+    top: 5px;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--primary-color);
+    font-size: 0.8rem;
+}
+
+.timeline-content {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 8px;
+}
+
+.timeline-title {
+    margin: 0;
+    color: var(--primary-color);
+    font-size: 1rem;
+}
+
+.chat-log {
+    margin: 8px 0;
+}
+
+.user-message-log, .ai-message-log {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.user-message-log {
+    background: #e3f2fd;
+    border-left: 3px solid var(--primary-color);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+}
+
+.user-message-log .d-flex {
+    align-items: flex-start;
+}
+
+.user-message-log p {
+    margin: 5px 0 0 0;
+    line-height: 1.4;
+}
+
+.ai-message-log {
+    background: #f3e5f5;
+    border-left: 3px solid var(--secondary-color);
+}
+
+.summary-log, .final-summary-log {
+    margin: 8px 0;
+}
+
+.summary-text, .prediction-text {
+    background: #fff9c4;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--warning-color);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.prediction-text {
+    background: #e8f5e8;
+    border-left-color: var(--success-color);
+}
+
+.conversation-history {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.history-item {
+    margin-bottom: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    background: white;
+    font-size: 0.8rem;
+}
+
+.history-item strong {
+    color: var(--primary-color);
+}
+
+/* 教員ログインページ */
+.teacher-login {
+    height: 100vh;
+    padding: 50px 0;
+    background: var(--gradient-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.login-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 1px solid #e9ecef;
+    max-width: 400px;
+    width: 100%;
+}
+
+.login-header i {
+    color: var(--primary-color);
+}
+
+.login-form .form-control {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    padding: 12px 15px;
+    transition: border-color 0.3s ease;
+}
+
+.login-form .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+.login-form .btn {
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.login-form .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.login-info .alert {
+    border-radius: 10px;
+    border: none;
+}
+
+/* 教員情報表示 */
+.teacher-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.teacher-info .badge {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+}
+
+/* 学習分析ダッシュボードのスタイル */
+.analysis-results {
+    margin-top: 20px;
+}
+
+.evaluation-card, .strengths-card, .improvements-card, .metrics-card {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+}
+
+.evaluation-card .card-header, 
+.strengths-card .card-header,
+.improvements-card .card-header,
+.metrics-card .card-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+}
+
+.evaluation-card .card-body,
+.strengths-card .card-body,
+.improvements-card .card-body,
+.metrics-card .card-body {
+    padding: 20px;
+}
+
+.score-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+    color: white;
+}
+
+.score-badge.score-1, .score-badge.score-2, .score-badge.score-3 {
+    background: var(--danger-color);
+}
+
+.score-badge.score-4, .score-badge.score-5, .score-badge.score-6 {
+    background: var(--warning-color);
+    color: #333;
+}
+
+.score-badge.score-7, .score-badge.score-8 {
+    background: var(--info-color);
+}
+
+.score-badge.score-9, .score-badge.score-10 {
+    background: var(--success-color);
+}
+
+.strengths-list, .improvements-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.strength-item, .improvement-item {
+    padding: 10px 0;
+    border-bottom: 1px solid #f8f9fa;
+    display: flex;
+    align-items: flex-start;
+}
+
+.strength-item:last-child, .improvement-item:last-child {
+    border-bottom: none;
+}
+
+.student-info-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.info-item {
+    margin-bottom: 10px;
+}
+
+/* クラス全体分析のスタイル */
+.class-trends-card, .misconceptions-card, .suggestions-card {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+}
+
+.class-trends-card .card-header {
+    background: linear-gradient(135deg, var(--success-color), #27ae60);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+}
+
+.misconceptions-card .card-header {
+    background: linear-gradient(135deg, var(--warning-color), #f39c12);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+}
+
+.suggestions-card .card-header {
+    background: linear-gradient(135deg, var(--info-color), #2980b9);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px 12px 0 0;
+}
+
+.student-analysis-links {
+    margin-top: 20px;
+}
+
+.student-link-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: #333;
+    display: block;
+}
+
+.student-link-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.student-link-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.student-link-number {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.student-link-score {
+    font-size: 0.9rem;
+    padding: 3px 8px;
+    border-radius: 12px;
+    color: white;
+}
+
+/* 選択肢使用インジケーター */
+.suggestion-indicator {
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.suggestion-indicator .badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    border-radius: 8px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1200px) {
+    .students-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    /* モバイルでは通常のスクロール可能なレイアウトに戻す */
+    .hero-section, .selection-page, .chat-page, .experiment-page, 
+    .reflection-page, .teacher-dashboard, .teacher-logs, 
+    .student-detail, .teacher-login {
+        height: auto;
+        min-height: 100vh;
+        padding: 30px 0;
+    }
+    
+    .chat-page .container, .reflection-page .container,
+    .teacher-logs .container, .student-detail .container {
+        height: auto;
+        min-height: 80vh;
+    }
+    
+    .hero-section h1 {
+        font-size: 2.5rem;
+    }
+    
+    .number-card {
+        height: 80px;
+        padding: 15px 8px;
+    }
+    
+    .number-display {
+        font-size: 1.8rem;
+    }
+    
+    .unit-card {
+        height: 120px;
+        padding: 20px 12px;
+    }
+    
+    .unit-icon {
+        font-size: 2rem;
+    }
+    
+    .chat-messages {
+        height: 250px;
+    }
+    
+    .message-content {
+        max-width: 85%;
+    }
+    
+    .students-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .timeline-header, .unit-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .learning-timeline {
+        padding-left: 15px;
+    }
+    
+    .timeline-marker {
+        left: -12px;
+        width: 20px;
+        height: 20px;
+        font-size: 0.7rem;
+    }
+    
+    .suggestions-buttons {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    
+    .suggestion-btn {
+        font-size: 0.9rem !important;
+        padding: 18px 45px 18px 18px !important;
+        min-height: 65px !important;
+        line-height: 1.4 !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .selection-page .container,
+    .chat-page .container,
+    .experiment-page .container,
+    .reflection-page .container,
+    .teacher-dashboard .container,
+    .teacher-logs .container,
+    .student-detail .container {
+        margin: 15px;
+        padding: 20px;
+    }
+    
+    .number-display {
+        font-size: 1.6rem;
+    }
+    
+    .unit-title {
+        font-size: 0.9rem;
+    }
+    
+    .experiment-icon {
+        font-size: 3rem;
+    }
+    
+    .dashboard-card {
+        padding: 20px;
+    }
+    
+    .dashboard-card .card-icon {
+        font-size: 2rem;
+    }
+    
+    /* 小さい画面での選択肢表示の最適化 */
+    .suggestion-btn {
+        font-size: 0.85rem !important;
+        padding: 15px 40px 15px 15px !important;
+        min-height: 55px !important;
+        border-radius: 10px !important;
+    }
+    
+    .suggestion-btn::after {
+        right: 10px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        width: 20px !important;
+        height: 20px !important;
+        font-size: 0.7rem !important;
+    }
+    
+    .suggestions-container {
+        padding: 12px !important;
+        margin-bottom: 12px !important;
+    }
+}
+
+/* スクロールバーのスタイル */
+.chat-messages::-webkit-scrollbar,
+.students-grid::-webkit-scrollbar,
+.learning-timeline::-webkit-scrollbar,
+.conversation-history::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track,
+.students-grid::-webkit-scrollbar-track,
+.learning-timeline::-webkit-scrollbar-track,
+.conversation-history::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.chat-messages::-webkit-scrollbar-thumb,
+.students-grid::-webkit-scrollbar-thumb,
+.learning-timeline::-webkit-scrollbar-thumb,
+.conversation-history::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover,
+.students-grid::-webkit-scrollbar-thumb:hover,
+.learning-timeline::-webkit-scrollbar-thumb:hover,
+.conversation-history::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

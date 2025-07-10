@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}学習単元選択{% endblock %}
+
+{% block content %}
+<div class="selection-page">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="mb-3">
+                <i class="fas fa-book text-primary"></i>
+                学習する単元を選択してください
+            </h2>
+            <p class="text-muted">今日学習したい単元をクリックしてください</p>
+        </div>
+        
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="row g-4">
+                    {% for unit in units %}
+                    <div class="col-lg-4 col-md-6">
+                        <div class="unit-card" onclick="selectUnit('{{ unit }}')">
+                            <div class="unit-icon">
+                                {% if '温度' in unit %}
+                                    <i class="fas fa-thermometer-half"></i>
+                                {% elif 'あたたまり' in unit %}
+                                    <i class="fas fa-fire"></i>
+                                {% elif 'ふっとう' in unit %}
+                                    <i class="fas fa-tint"></i>
+                                {% elif '冷やした' in unit %}
+                                    <i class="fas fa-snowflake"></i>
+                                {% else %}
+                                    <i class="fas fa-flask"></i>
+                                {% endif %}
+                            </div>
+                            <h5 class="unit-title">{{ unit }}</h5>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-5">
+            <a href="/select_number" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>戻る
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function selectUnit(unit) {
+    // 選択されたカードにアクティブクラスを追加
+    document.querySelectorAll('.unit-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    event.target.closest('.unit-card').classList.add('active');
+    
+    // 少し待ってから次のページに移動
+    setTimeout(() => {
+        window.location.href = `/prediction?unit=${encodeURIComponent(unit)}`;
+    }, 300);
+}
+</script>
+{% endblock %}

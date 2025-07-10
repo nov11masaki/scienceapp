@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}教員用ダッシュボード{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="dashboard-header text-center mb-5">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div></div>
+                        <h1 class="display-4 mb-0">
+                            <i class="fas fa-chalkboard-teacher text-primary"></i>
+                            教員用ダッシュボード
+                        </h1>
+                        <div class="teacher-info">
+                            <span class="badge bg-success me-2">{{ teacher_id }}</span>
+                            <a href="/teacher/logout" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-sign-out-alt me-1"></i>ログアウト
+                            </a>
+                        </div>
+                    </div>
+                    <p class="lead text-muted">学習者の予想・考察の過程を確認できます</p>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-lg-3">
+                        <div class="dashboard-card">
+                            <div class="card-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <h4>学習ログ</h4>
+                            <p>学生の対話履歴と学習過程を確認</p>
+                            <a href="/teacher/logs" class="btn btn-primary">
+                                <i class="fas fa-eye me-2"></i>ログを見る
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3">
+                        <div class="dashboard-card">
+                            <div class="card-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h4>学生一覧</h4>
+                            <p>学生ごとの学習状況を確認</p>
+                            <a href="/teacher/logs" class="btn btn-info">
+                                <i class="fas fa-list me-2"></i>一覧を見る
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3">
+                        <div class="dashboard-card featured-card">
+                            <div class="card-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <h4>AI学習分析</h4>
+                            <p>Gemini AIによる自動分析と評価</p>
+                            <a href="/teacher/analysis" class="btn btn-warning">
+                                <i class="fas fa-magic me-2"></i>分析を見る
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-2">
+                    <div class="col-lg-6">
+                        <div class="dashboard-card">
+                            <div class="card-icon">
+                                <i class="fas fa-download"></i>
+                            </div>
+                            <h4>データエクスポート</h4>
+                            <p>学習データをCSVで出力</p>
+                            <button class="btn btn-secondary" onclick="exportData()">
+                                <i class="fas fa-file-csv me-2"></i>エクスポート
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="dashboard-card">
+                            <div class="card-icon">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                            <h4>システム設定</h4>
+                            <p>AIモデルや表示設定を調整</p>
+                            <button class="btn btn-outline-primary" disabled>
+                                <i class="fas fa-tools me-2"></i>設定（準備中）
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="quick-filters mt-5">
+                    <h3 class="mb-4">
+                        <i class="fas fa-filter"></i>
+                        クイックフィルター
+                    </h3>
+                    <div class="row g-3">
+                        {% for unit in units %}
+                        <div class="col-lg-3 col-md-4 col-6">
+                            <a href="/teacher/logs?unit={{ unit|urlencode }}" class="filter-card">
+                                <div class="filter-icon">
+                                    {% if '温度' in unit %}
+                                        <i class="fas fa-thermometer-half"></i>
+                                    {% elif 'あたたまり' in unit %}
+                                        <i class="fas fa-fire"></i>
+                                    {% elif 'ふっとう' in unit %}
+                                        <i class="fas fa-tint"></i>
+                                    {% elif '冷やした' in unit %}
+                                        <i class="fas fa-snowflake"></i>
+                                    {% else %}
+                                        <i class="fas fa-flask"></i>
+                                    {% endif %}
+                                </div>
+                                <span class="filter-title">{{ unit }}</span>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="text-center mt-5">
+                    <a href="/" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-2"></i>学習システムに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function exportData() {
+    const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    
+    fetch(`/teacher/export?date=${today}`)
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('エクスポート中にエラーが発生しました。');
+    });
+}
+</script>
+{% endblock %}

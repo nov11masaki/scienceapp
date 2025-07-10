@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}学習の続きから始める{% endblock %}
+
+{% block content %}
+<div class="selection-page">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="text-center mb-4">
+                    <h2 class="mb-3">
+                        <i class="fas fa-play text-success"></i>
+                        学習の続きから始める
+                    </h2>
+                    <p class="lead">
+                        以前の学習の続きから始めることができます
+                    </p>
+                </div>
+                
+                <div class="resume-form">
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="resumeForm">
+                                <div class="mb-3">
+                                    <label for="studentNumber" class="form-label">
+                                        <i class="fas fa-user me-2"></i>出席番号
+                                    </label>
+                                    <select class="form-select" id="studentNumber" required>
+                                        <option value="">出席番号を選択してください</option>
+                                        {% for i in range(1, 41) %}
+                                        <option value="{{ i }}">{{ i }}番</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="unitSelect" class="form-label">
+                                        <i class="fas fa-book me-2"></i>学習単元
+                                    </label>
+                                    <select class="form-select" id="unitSelect" required>
+                                        <option value="">単元を選択してください</option>
+                                        <option value="空気の温度と体積">空気の温度と体積</option>
+                                        <option value="水の状態変化">水の状態変化</option>
+                                        <option value="植物の発芽">植物の発芽</option>
+                                        <option value="魚の誕生">魚の誕生</option>
+                                        <option value="花から実へ">花から実へ</option>
+                                        <option value="台風と気象情報">台風と気象情報</option>
+                                        <option value="流れる水のはたらき">流れる水のはたらき</option>
+                                        <option value="物のとけ方">物のとけ方</option>
+                                        <option value="振り子の運動">振り子の運動</option>
+                                        <option value="電流の働き">電流の働き</option>
+                                        <option value="人の誕生">人の誕生</option>
+                                        <option value="月と太陽">月と太陽</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-success btn-lg" id="resumeButton">
+                                        <i class="fas fa-play me-2"></i>
+                                        続きから始める
+                                    </button>
+                                    <a href="/" class="btn btn-outline-secondary">
+                                        <i class="fas fa-home me-2"></i>
+                                        ホームに戻る
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 状態表示 -->
+                <div class="resume-status mt-3" id="resumeStatus" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span id="statusMessage">学習状況を確認中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('resumeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const studentNumber = document.getElementById('studentNumber').value;
+    const unit = document.getElementById('unitSelect').value;
+    
+    if (!studentNumber || !unit) {
+        alert('出席番号と単元を選択してください');
+        return;
+    }
+    
+    // 状態表示
+    document.getElementById('resumeStatus').style.display = 'block';
+    document.getElementById('resumeButton').disabled = true;
+    
+    fetch('/resume_session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            student_number: parseInt(studentNumber),
+            unit: unit
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.redirect) {
+            document.getElementById('statusMessage').textContent = data.message;
+            setTimeout(() => {
+                window.location.href = data.redirect;
+            }, 1500);
+        } else if (data.error) {
+            document.getElementById('resumeStatus').style.display = 'none';
+            document.getElementById('resumeButton').disabled = false;
+            alert('エラー: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('エラー:', error);
+        document.getElementById('resumeStatus').style.display = 'none';
+        document.getElementById('resumeButton').disabled = false;
+        alert('通信エラーが発生しました');
+    });
+});
+</script>
+{% endblock %}
