@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}指導案管理 - 理科学習支援システム{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>📋 指導案管理</h2>
+                <div>
+                    <a href="{{ url_for('teacher') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> ダッシュボードに戻る
+                    </a>
+                    <span class="ms-3 text-muted">ログイン: {{ teacher_id }}</span>
+                </div>
+            </div>
+
+            <!-- フラッシュメッセージ -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- 指導案アップロード -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📁 指導案アップロード</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('upload_lesson_plan') }}" method="post" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="unit" class="form-label">学習単元</label>
+                                <select name="unit" id="unit" class="form-select" required>
+                                    <option value="">単元を選択してください</option>
+                                    {% for unit in units %}
+                                    <option value="{{ unit }}">{{ unit }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="file" class="form-label">指導案ファイル（PDF）</label>
+                                <input type="file" name="file" id="file" class="form-control" accept=".pdf" required>
+                                <div class="form-text">PDFファイルのみアップロード可能です（最大16MB）</div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-upload"></i> アップロード
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- アップロード済み指導案一覧 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📚 アップロード済み指導案</h5>
+                </div>
+                <div class="card-body">
+                    {% if lesson_plans %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>学習単元</th>
+                                    <th>ファイル名</th>
+                                    <th>アップロード日時</th>
+                                    <th>ファイルサイズ</th>
+                                    <th>プレビュー</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for unit, info in lesson_plans.items() %}
+                                <tr>
+                                    <td><span class="badge bg-primary">{{ unit }}</span></td>
+                                    <td>{{ info.filename }}</td>
+                                    <td>{{ info.upload_date[:19] }}</td>
+                                    <td>
+                                        {% if info.content_length %}
+                                            {{ "%.1f KB"|format(info.content_length / 1024) }}
+                                        {% else %}
+                                            不明
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if info.content_preview %}
+                                        <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#preview-{{ loop.index }}" aria-expanded="false">
+                                            <i class="fas fa-eye"></i> プレビュー
+                                        </button>
+                                        <div class="collapse mt-2" id="preview-{{ loop.index }}">
+                                            <div class="card card-body">
+                                                <small class="text-muted">{{ info.content_preview }}...</small>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('delete_lesson_plan', unit=unit) }}" 
+                                           class="btn btn-sm btn-outline-danger"
+                                           onclick="return confirm('{{ unit }}の指導案を削除しますか？')">
+                                            <i class="fas fa-trash"></i> 削除
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-pdf fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">まだ指導案がアップロードされていません。</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 指導案活用の説明 -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">💡 指導案の活用について</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>指導案が分析に与える効果</h6>
+                            <ul class="small">
+                                <li>学習目標に沿った評価が可能になります</li>
+                                <li>指導計画で想定された思考過程を評価基準に含めます</li>
+                                <li>単元固有の重要ポイントを考慮した分析を行います</li>
+                                <li>次回授業への具体的な提案を含めた分析結果を提供します</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>指導案アップロードのポイント</h6>
+                            <ul class="small">
+                                <li>学習目標が明記されたPDFファイルをアップロードしてください</li>
+                                <li>評価規準や評価基準が含まれていると分析精度が向上します</li>
+                                <li>既習事項や発展内容の記載があると関連付けた分析が可能です</li>
+                                <li>同一単元に新しいファイルをアップロードすると上書きされます</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

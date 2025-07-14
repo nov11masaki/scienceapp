@@ -98,5 +98,79 @@
       "used_suggestion": true,
       "suggestion_index": 1
     }
+  },
+  {
+    "timestamp": "2025-07-14T17:57:14.036721",
+    "student_number": "2",
+    "unit": "空気の温度と体積",
+    "log_type": "prediction_chat",
+    "data": {
+      "user_message": "わかんない",
+      "ai_response": "そっか、わからないよね。むずかしいもんね。たとえば、おふろに入ると空気はどうなるかな？",
+      "conversation_count": 1,
+      "used_suggestion": false,
+      "suggestion_index": null
+    }
+  },
+  {
+    "timestamp": "2025-07-14T17:59:05.556579",
+    "student_number": "2",
+    "unit": "空気の温度と体積",
+    "log_type": "prediction_chat",
+    "data": {
+      "user_message": "きいてみる",
+      "ai_response": "きいてみるんだね。おもしろい！空気は、あたためるとどうなるか、きいてみたいんだね。だれにきいてみたいかな？",
+      "conversation_count": 2,
+      "used_suggestion": true,
+      "suggestion_index": 3
+    }
+  },
+  {
+    "timestamp": "2025-07-14T17:59:27.671703",
+    "student_number": "2",
+    "unit": "空気の温度と体積",
+    "log_type": "prediction_chat",
+    "data": {
+      "user_message": "はい",
+      "ai_response": "そうなんだね。「はい」ってことは、きいてみたい人がいるのかな？たとえば、おうちの人とか、学校の先生とか？",
+      "conversation_count": 3,
+      "used_suggestion": true,
+      "suggestion_index": 1
+    }
+  },
+  {
+    "timestamp": "2025-07-14T17:59:33.663924",
+    "student_number": "2",
+    "unit": "空気の温度と体積",
+    "log_type": "prediction_summary",
+    "data": {
+      "summary": "あなたは、質問の意味がわからないということから、人に聞いてみればわかるだろうと予想したんですね。",
+      "conversation": [
+        {
+          "content": "わかんない",
+          "role": "user"
+        },
+        {
+          "content": "そっか、わからないよね。むずかしいもんね。たとえば、おふろに入ると空気はどうなるかな？",
+          "role": "assistant"
+        },
+        {
+          "content": "きいてみる",
+          "role": "user"
+        },
+        {
+          "content": "きいてみるんだね。おもしろい！空気は、あたためるとどうなるか、きいてみたいんだね。だれにきいてみたいかな？",
+          "role": "assistant"
+        },
+        {
+          "content": "はい",
+          "role": "user"
+        },
+        {
+          "content": "そうなんだね。「はい」ってことは、きいてみたい人がいるのかな？たとえば、おうちの人とか、学校の先生とか？",
+          "role": "assistant"
+        }
+      ]
+    }
   }
 ]

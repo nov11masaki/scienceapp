@@ -10,6 +10,9 @@ import hashlib
 import ssl
 import certifi
 import urllib3
+import re
+from werkzeug.utils import secure_filename
+from PyPDF2 import PdfReader
 
 # 環境変数を読み込み
 load_dotenv()
@@ -22,6 +25,18 @@ ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # 本番環境では安全なキーに変更
+
+# ファイルアップロード設定
+UPLOAD_FOLDER = 'lesson_plans'
+ALLOWED_EXTENSIONS = {'pdf'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB制限
+
+# アップロードディレクトリが存在しない場合は作成
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # 教員認証情報（実際の運用では環境変数やデータベースに保存）
 TEACHER_CREDENTIALS = {
@@ -178,6 +193,82 @@ def extract_message_from_json_response(response):
     except (json.JSONDecodeError, Exception) as e:
         print(f"JSON解析エラー: {e}, 元のレスポンスを返します")
         return response
+
+def extract_text_from_pdf(pdf_path):
+    """PDFファイルからテキストを抽出する"""
+    try:
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PdfReader(file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+        return text.strip()
+    except Exception as e:
+        print(f"PDF読み込みエラー: {e}")
+        return None
+
+def save_lesson_plan_info(unit, filename, content):
+    """指導案情報をJSONファイルに保存"""
+    lesson_plans_file = "lesson_plans/lesson_plans_index.json"
+    
+    # 既存の指導案情報を読み込み
+    lesson_plans = {}
+    if os.path.exists(lesson_plans_file):
+        try:
+            with open(lesson_plans_file, 'r', encoding='utf-8') as f:
+                lesson_plans = json.load(f)
+        except (json.JSONDecodeError, Exception):
+            lesson_plans = {}
+    
+    # 新しい指導案情報を追加
+    lesson_plans[unit] = {
+        'filename': filename,
+        'upload_date': datetime.now().isoformat(),
+        'content_preview': content[:500] if content else "",  # 最初の500文字のプレビュー
+        'content_length': len(content) if content else 0
+    }
+    
+    # ファイルに保存
+    with open(lesson_plans_file, 'w', encoding='utf-8') as f:
+        json.dump(lesson_plans, f, ensure_ascii=False, indent=2)
+
+def load_lesson_plan_content(unit):
+    """指定された単元の指導案内容を読み込む"""
+    lesson_plans_file = "lesson_plans/lesson_plans_index.json"
+    
+    if not os.path.exists(lesson_plans_file):
+        return None
+    
+    try:
+        with open(lesson_plans_file, 'r', encoding='utf-8') as f:
+            lesson_plans = json.load(f)
+        
+        if unit not in lesson_plans:
+            return None
+        
+        # PDFファイルからテキストを再読み込み
+        pdf_path = os.path.join(UPLOAD_FOLDER, lesson_plans[unit]['filename'])
+        if os.path.exists(pdf_path):
+            return extract_text_from_pdf(pdf_path)
+        else:
+            return None
+            
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"指導案読み込みエラー: {e}")
+        return None
+
+def get_lesson_plans_list():
+    """アップロード済みの指導案一覧を取得"""
+    lesson_plans_file = "lesson_plans/lesson_plans_index.json"
+    
+    if not os.path.exists(lesson_plans_file):
+        return {}
+    
+    try:
+        with open(lesson_plans_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, Exception):
+        return {}
 
 def analyze_student_language_level(conversation):
     """児童の言語レベルを分析する"""
@@ -764,7 +855,103 @@ def teacher_logout():
 @require_teacher_auth
 def teacher():
     """教員用ダッシュボード"""
-    return render_template('teacher/dashboard.html', units=UNITS, teacher_id=session.get('teacher_id'))
+    # 指導案一覧も含めて表示
+    lesson_plans = get_lesson_plans_list()
+    return render_template('teacher/dashboard.html', 
+                         units=UNITS, 
+                         teacher_id=session.get('teacher_id'),
+                         lesson_plans=lesson_plans)
+
+@app.route('/teacher/lesson_plans')
+@require_teacher_auth
+def teacher_lesson_plans():
+    """指導案管理ページ"""
+    lesson_plans = get_lesson_plans_list()
+    return render_template('teacher/lesson_plans.html', 
+                         units=UNITS, 
+                         lesson_plans=lesson_plans,
+                         teacher_id=session.get('teacher_id'))
+
+@app.route('/teacher/lesson_plans/upload', methods=['POST'])
+@require_teacher_auth
+def upload_lesson_plan():
+    """指導案PDFのアップロード"""
+    try:
+        unit = request.form.get('unit')
+        
+        # 単元の検証
+        if unit not in UNITS:
+            flash('無効な単元が選択されました', 'error')
+            return redirect(url_for('teacher_lesson_plans'))
+        
+        # ファイルの確認
+        if 'file' not in request.files:
+            flash('ファイルが選択されていません', 'error')
+            return redirect(url_for('teacher_lesson_plans'))
+        
+        file = request.files['file']
+        if file.filename == '':
+            flash('ファイルが選択されていません', 'error')
+            return redirect(url_for('teacher_lesson_plans'))
+        
+        if file and allowed_file(file.filename):
+            # ファイル名を安全にする（単元名を含める）
+            filename = secure_filename(f"{unit}_{file.filename}")
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            # 既存ファイルがあれば削除
+            lesson_plans = get_lesson_plans_list()
+            if unit in lesson_plans:
+                old_file = os.path.join(app.config['UPLOAD_FOLDER'], lesson_plans[unit]['filename'])
+                if os.path.exists(old_file):
+                    os.remove(old_file)
+            
+            # ファイルを保存
+            file.save(file_path)
+            
+            # PDFからテキストを抽出
+            extracted_text = extract_text_from_pdf(file_path)
+            
+            if extracted_text:
+                # 指導案情報を保存
+                save_lesson_plan_info(unit, filename, extracted_text)
+                flash(f'{unit}の指導案がアップロードされました', 'success')
+            else:
+                flash('PDFからテキストを抽出できませんでした', 'error')
+                os.remove(file_path)  # 失敗した場合はファイルを削除
+        else:
+            flash('PDFファイルのみアップロード可能です', 'error')
+            
+    except Exception as e:
+        flash(f'アップロード中にエラーが発生しました: {str(e)}', 'error')
+    
+    return redirect(url_for('teacher_lesson_plans'))
+
+@app.route('/teacher/lesson_plans/delete/<unit>')
+@require_teacher_auth
+def delete_lesson_plan(unit):
+    """指導案の削除"""
+    try:
+        lesson_plans = get_lesson_plans_list()
+        if unit in lesson_plans:
+            # ファイルを削除
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], lesson_plans[unit]['filename'])
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # インデックスから削除
+            del lesson_plans[unit]
+            lesson_plans_file = "lesson_plans/lesson_plans_index.json"
+            with open(lesson_plans_file, 'w', encoding='utf-8') as f:
+                json.dump(lesson_plans, f, ensure_ascii=False, indent=2)
+            
+            flash(f'{unit}の指導案が削除されました', 'success')
+        else:
+            flash('指導案が見つかりません', 'error')
+    except Exception as e:
+        flash(f'削除中にエラーが発生しました: {str(e)}', 'error')
+    
+    return redirect(url_for('teacher_lesson_plans'))
 
 @app.route('/teacher/logs')
 @require_teacher_auth
@@ -1486,7 +1673,7 @@ def resume_session():
 
 # ログ分析機能
 def analyze_student_learning(student_number, unit, logs):
-    """特定の学生・単元の学習過程をGeminiで分析"""
+    """特定の学生・単元の学習過程をGeminiで分析（指導案考慮）"""
     print(f"分析開始 - 学生: {student_number}, 単元: {unit}")
     
     # 該当する学生のログを抽出
@@ -1506,6 +1693,26 @@ def analyze_student_learning(student_number, unit, logs):
             'engagement': 'データなし',
             'scientific_understanding': 'データなし'
         }
+    
+    # 指導案の内容を取得
+    lesson_plan_content = load_lesson_plan_content(unit)
+    lesson_plan_context = ""
+    
+    if lesson_plan_content:
+        # 指導案から重要な部分を抽出（最初の1000文字程度）
+        lesson_plan_preview = lesson_plan_content[:1000]
+        lesson_plan_context = f"""
+指導案に基づく評価基準:
+{lesson_plan_preview}
+
+[指導案の内容を踏まえて]
+- 学習目標の達成度
+- 指導計画に沿った思考過程
+- 授業で重視される観点
+を含めて分析してください。
+"""
+    else:
+        lesson_plan_context = "※指導案が設定されていないため、一般的な理科学習の観点で分析します。"
     
     # 対話履歴を整理
     prediction_chats = []
@@ -1534,12 +1741,14 @@ def analyze_student_learning(student_number, unit, logs):
     
     print(f"予想対話数: {len(prediction_chats)}, 考察対話数: {len(reflection_chats)}")
     
-    # 分析プロンプト作成（教育的観点を強化）
+    # 分析プロンプト作成（指導案を考慮した教育的観点）
     analysis_prompt = f"""
 小学生の理科学習記録を詳細に評価してください。
 
 学習内容: {unit}
 学習者ID: {student_number}
+
+{lesson_plan_context}
 
 【予想段階の記録】
 """
@@ -1782,15 +1991,17 @@ def analyze_student_learning(student_number, unit, logs):
         }
 
 def analyze_class_trends(logs, unit=None):
-    """クラス全体の学習傾向をGeminiで分析"""
+    """クラス全体の学習傾向をGeminiで分析（指導案考慮）"""
     if unit:
         # 特定単元の分析
         unit_logs = [log for log in logs if log.get('unit') == unit]
         students = set(log.get('student_number') for log in unit_logs)
+        analysis_unit = unit
     else:
         # 全体の分析
         unit_logs = logs
         students = set(log.get('student_number') for log in logs)
+        analysis_unit = "全単元"
     
     if not unit_logs or len(students) == 0:
         return {
@@ -1799,6 +2010,25 @@ def analyze_class_trends(logs, unit=None):
             'effective_approaches': [],
             'recommendations': []
         }
+    
+    # 指導案の内容を取得（特定単元の場合）
+    lesson_plan_context = ""
+    if unit:
+        lesson_plan_content = load_lesson_plan_content(unit)
+        if lesson_plan_content:
+            lesson_plan_preview = lesson_plan_content[:800]
+            lesson_plan_context = f"""
+指導案情報:
+{lesson_plan_preview}
+
+[指導案に基づく分析観点]
+- 指導目標の達成状況
+- 予想されていた課題や誤解の出現
+- 指導計画との整合性
+- 次回授業への示唆
+"""
+        else:
+            lesson_plan_context = "※この単元の指導案は設定されていません。"
     
     # 学習データを要約
     summary_data = {}
@@ -1824,8 +2054,10 @@ def analyze_class_trends(logs, unit=None):
     analysis_prompt = f"""
 クラス全体の学習状況を分析してください。
 
-対象単元: {unit if unit else '全単元'}
+対象単元: {analysis_unit}
 学習者数: {len(students)}人
+
+{lesson_plan_context}
 
 各学習者の状況:
 """
