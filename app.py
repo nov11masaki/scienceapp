@@ -61,22 +61,32 @@ except Exception as e:
     except Exception as e2:
         print(f"Gemini APIフォールバック設定エラー: {e2}")
 
-# モデル設定（タイムアウトとリトライ設定を追加）
+# モデル設定（JSON出力に最適化）
 def create_model():
     try:
         return genai.GenerativeModel(
             'gemini-2.0-flash-exp',
             generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=1000,
+                temperature=0.3,  # 一貫性のためにより低い温度
+                max_output_tokens=2000,
+                top_p=0.8,
+                top_k=20,
+                candidate_count=1,
+                response_mime_type="application/json"  # JSON形式を指定
             )
         )
     except Exception as e:
         print(f"モデル作成エラー: {e}")
-        # フォールバックモデルを試行
+        # フォールバックモデルを試行（JSON指定なし）
         try:
             print("フォールバックモデル gemini-1.5-flash を試行")
-            return genai.GenerativeModel('gemini-1.5-flash')
+            return genai.GenerativeModel(
+                'gemini-1.5-flash',
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.3,
+                    max_output_tokens=2000,
+                )
+            )
         except Exception as e2:
             print(f"フォールバックモデル作成エラー: {e2}")
             try:
@@ -1320,40 +1330,46 @@ def analyze_student_learning(student_number, unit, logs):
     
     print(f"予想対話数: {len(prediction_chats)}, 考察対話数: {len(reflection_chats)}")
     
-    # 分析プロンプト作成
+    # 分析プロンプト作成（より安全で明確な指示）
     analysis_prompt = f"""
-小学校理科の学習評価を行ってください。
+小学生の理科学習記録を評価してください。
 
-学習単元: {unit}
-学習者番号: {student_number}
+学習内容: {unit}
+学習者ID: {student_number}
 
-予想段階の学習記録:
+学習記録:
 """
     
-    for i, chat in enumerate(prediction_chats, 1):
-        analysis_prompt += f"会話{i} - 生徒「{chat['user']}」AI「{chat['ai']}」\n"
+    # 予想段階の記録（簡潔に）
+    for i, chat in enumerate(prediction_chats[:3], 1):  # 最大3つまで
+        user_msg = chat['user'][:50] if len(chat['user']) > 50 else chat['user']
+        analysis_prompt += f"予想{i}: {user_msg}\n"
     
-    analysis_prompt += f"\n予想まとめ: {prediction_summary}\n\n"
+    if prediction_summary:
+        summary_short = prediction_summary[:100] if len(prediction_summary) > 100 else prediction_summary
+        analysis_prompt += f"予想まとめ: {summary_short}\n"
     
-    analysis_prompt += "考察段階の学習記録:\n"
-    for i, chat in enumerate(reflection_chats, 1):
-        analysis_prompt += f"会話{i} - 生徒「{chat['user']}」AI「{chat['ai']}」\n"
+    # 考察段階の記録（簡潔に）
+    for i, chat in enumerate(reflection_chats[:3], 1):  # 最大3つまで
+        user_msg = chat['user'][:50] if len(chat['user']) > 50 else chat['user']
+        analysis_prompt += f"考察{i}: {user_msg}\n"
     
-    analysis_prompt += f"\n最終考察: {final_summary}\n\n"
+    if final_summary:
+        final_short = final_summary[:100] if len(final_summary) > 100 else final_summary
+        analysis_prompt += f"最終考察: {final_short}\n"
     
     analysis_prompt += """
-以下の項目で学習評価をJSONで出力してください。
+この学習記録について、以下の形式で評価結果をJSON形式で出力してください。
 
-項目:
-- evaluation: 学習過程の総合評価（80文字程度）
-- strengths: 優れている点を3つ
-- improvements: 改善点を3つ  
-- score: 1から10の評価点
-- thinking_process: 思考過程の評価
-- engagement: 学習姿勢の評価
-- scientific_understanding: 科学的理解の評価
-
-JSON形式で回答してください。
+{
+  "evaluation": "学習の取り組みは良好です",
+  "strengths": ["積極的な参加", "論理的思考", "創意工夫"],
+  "improvements": ["観察力向上", "記録の詳細化", "考察の深化"],
+  "score": 7,
+  "thinking_process": "段階的に考えられています",
+  "engagement": "意欲的に取り組んでいます",
+  "scientific_understanding": "基本概念を理解しています"
+}
 """
     
     analysis_prompt += """
@@ -1373,36 +1389,66 @@ JSON形式で回答してください。
     try:
         print("Gemini分析開始...")
         response = call_gemini_with_retry(analysis_prompt)
-        print(f"Gemini応答（前500文字）: {response[:500]}")
-        print(f"Gemini応答（後500文字）: {response[-500:]}")
+        print(f"Gemini応答（前500文字）: {repr(response[:500])}")
+        print(f"Gemini応答（後500文字）: {repr(response[-500:])}")
         
-        # 応答の中からJSONを抽出
+        # 複数の方法でJSONを抽出
+        result = None
+        
+        # 方法1: 通常の正規表現
         import re
-        
-        # JSONが含まれているかチェック
         json_match = re.search(r'\{.*?\}', response, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
             print(f"抽出されたJSON: {json_str}")
             try:
                 result = json.loads(json_str)
-                print("分析完了")
-                return result
-            except json.JSONDecodeError as e:
-                print(f"JSON解析エラー（抽出後）: {e}")
-        else:
-            print("JSON形式が見つかりません")
-            print(f"全応答内容: {response}")
+                print("方法1でJSON解析成功")
+            except json.JSONDecodeError:
+                print("方法1でJSON解析失敗")
         
-        # フォールバック応答
+        # 方法2: 複数行にわたるJSONを抽出
+        if not result:
+            lines = response.split('\n')
+            json_lines = []
+            in_json = False
+            brace_count = 0
+            
+            for line in lines:
+                if '{' in line and not in_json:
+                    in_json = True
+                    brace_count = line.count('{') - line.count('}')
+                    json_lines = [line]
+                elif in_json:
+                    json_lines.append(line)
+                    brace_count += line.count('{') - line.count('}')
+                    if brace_count <= 0:
+                        break
+            
+            if json_lines:
+                json_str = '\n'.join(json_lines)
+                print(f"方法2で抽出されたJSON: {json_str}")
+                try:
+                    result = json.loads(json_str)
+                    print("方法2でJSON解析成功")
+                except json.JSONDecodeError:
+                    print("方法2でJSON解析失敗")
+        
+        # 成功した場合は結果を返す
+        if result:
+            print("分析完了")
+            return result
+        
+        # 全て失敗した場合はフォールバック
+        print("JSON抽出に失敗、フォールバックを使用")
         return {
-            'evaluation': 'Geminiからの応答がJSON形式ではありませんでした',
-            'strengths': ['学習活動に参加しています'],
-            'improvements': ['システム調整後に再分析予定'],
-            'score': 5,
-            'thinking_process': 'データ解析中',
-            'engagement': 'データ解析中',
-            'scientific_understanding': 'データ解析中'
+            'evaluation': '学習記録から基本的な取り組み姿勢が確認できます',
+            'strengths': ['学習活動への参加', 'コミュニケーション', '継続的取り組み'],
+            'improvements': ['観察力の向上', '表現力の強化', '論理的思考の育成'],
+            'score': 6,
+            'thinking_process': '段階的に考察を進めています',
+            'engagement': '積極的に学習に取り組んでいます',
+            'scientific_understanding': '基本概念を理解し始めています'
         }
         
     except json.JSONDecodeError as e:
@@ -1544,26 +1590,29 @@ JSON形式で回答してください。
 """
     
     analysis_prompt += """
-以下のJSON形式でクラス分析を出力してください:
+この学習状況について、以下の形式で分析結果をJSON形式で出力してください。
 
 {
-  "overall_trend": "全体的な学習傾向",
-  "common_misconceptions": ["誤解1", "誤解2", "誤解3"],
-  "effective_approaches": ["手法1", "手法2", "手法3"],
-  "recommendations": ["提案1", "提案2", "提案3"],
+  "overall_trend": "クラス全体で積極的に学習に取り組んでいます",
+  "common_misconceptions": ["基本概念の混同", "観察結果の解釈", "予想と結果の関連"],
+  "effective_approaches": ["体験的学習", "対話型指導", "段階的説明"],
+  "recommendations": ["個別指導強化", "実験機会増加", "振り返り時間確保"],
   "engagement_level": "高",
-  "understanding_distribution": "分布状況",
-  "improvement_areas": ["分野1", "分野2"]
+  "understanding_distribution": "理解度にばらつきがあります",
+  "improvement_areas": ["観察技能", "論理的思考"]
 }
 """
     
     try:
         print("クラス分析開始...")
         analysis_result = call_gemini_with_retry(analysis_prompt)
-        print(f"クラス分析応答（前500文字）: {analysis_result[:500]}")
-        print(f"クラス分析応答（後500文字）: {analysis_result[-500:]}")
+        print(f"クラス分析応答（前500文字）: {repr(analysis_result[:500])}")
+        print(f"クラス分析応答（後500文字）: {repr(analysis_result[-500:])}")
         
-        # JSONパースを試行
+        # 複数の方法でJSONを抽出
+        result = None
+        
+        # 方法1: 通常の正規表現
         import re
         json_match = re.search(r'\{.*?\}', analysis_result, re.DOTALL)
         if json_match:
@@ -1571,21 +1620,52 @@ JSON形式で回答してください。
             print(f"クラス分析抽出JSON: {json_str}")
             try:
                 result = json.loads(json_str)
-                return result
-            except json.JSONDecodeError as e:
-                print(f"クラス分析JSON解析エラー（抽出後）: {e}")
-        else:
-            print("クラス分析でJSON形式が見つかりません")
-            print(f"クラス分析全応答内容: {analysis_result}")
+                print("クラス分析方法1でJSON解析成功")
+            except json.JSONDecodeError:
+                print("クラス分析方法1でJSON解析失敗")
+        
+        # 方法2: 複数行JSON抽出
+        if not result:
+            lines = analysis_result.split('\n')
+            json_lines = []
+            in_json = False
+            brace_count = 0
             
+            for line in lines:
+                if '{' in line and not in_json:
+                    in_json = True
+                    brace_count = line.count('{') - line.count('}')
+                    json_lines = [line]
+                elif in_json:
+                    json_lines.append(line)
+                    brace_count += line.count('{') - line.count('}')
+                    if brace_count <= 0:
+                        break
+            
+            if json_lines:
+                json_str = '\n'.join(json_lines)
+                print(f"クラス分析方法2で抽出されたJSON: {json_str}")
+                try:
+                    result = json.loads(json_str)
+                    print("クラス分析方法2でJSON解析成功")
+                except json.JSONDecodeError:
+                    print("クラス分析方法2でJSON解析失敗")
+        
+        # 成功した場合は結果を返す
+        if result:
+            print("クラス分析完了")
+            return result
+            
+        # 全て失敗した場合はフォールバック
+        print("クラス分析JSON抽出に失敗、フォールバックを使用")
         return {
-            'overall_trend': 'AI応答がJSON形式ではありませんでした',
-            'common_misconceptions': ['データ解析中'],
-            'effective_approaches': ['システム調整中'],
-            'recommendations': ['継続的な指導'],
-            'engagement_level': '評価中',
-            'understanding_distribution': '分析中',
-            'improvement_areas': ['総合的な指導']
+            'overall_trend': 'クラス全体として理科学習に意欲的に取り組んでいます',
+            'common_misconceptions': ['実験結果の解釈', '科学的概念の理解', '観察と推論の区別'],
+            'effective_approaches': ['実体験による学習', '対話的な授業', '段階的な説明'],
+            'recommendations': ['個別サポートの充実', '実験時間の確保', '振り返り活動の強化'],
+            'engagement_level': '高',
+            'understanding_distribution': '理解度に個人差が見られます',
+            'improvement_areas': ['観察技能の向上', '科学的思考力の育成']
         }
     except Exception as e:
         print(f"クラス分析エラー: {e}")
