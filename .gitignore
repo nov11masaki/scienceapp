@@ -54,7 +54,9 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 logs/*.log
+logs/*.json
 
 # Temporary files
 *.tmp
