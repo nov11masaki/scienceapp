@@ -1397,3 +1397,108 @@ body {
 .conversation-history::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
+
+/* 詳細評価セクション */
+.detailed-evaluation {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.detailed-evaluation h3 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.evaluation-section {
+    background: var(--light-bg);
+    border-radius: 10px;
+    padding: 20px;
+    height: 100%;
+}
+
+.section-header h4 {
+    color: var(--dark-color);
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.evaluation-items {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.evaluation-item {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.item-label {
+    font-weight: 600;
+    color: var(--dark-color);
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.item-label i {
+    color: var(--primary-color);
+    margin-right: 5px;
+}
+
+.item-content {
+    color: #555;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* 予想の質セクション */
+.evaluation-section:first-child .evaluation-item {
+    border-left-color: var(--info-color);
+}
+
+.evaluation-section:first-child .item-label i {
+    color: var(--info-color);
+}
+
+/* 考察の質セクション */
+.evaluation-section:last-child .evaluation-item {
+    border-left-color: var(--success-color);
+}
+
+.evaluation-section:last-child .item-label i {
+    color: var(--success-color);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .detailed-evaluation {
+        padding: 15px;
+    }
+    
+    .evaluation-section {
+        margin-bottom: 20px;
+        padding: 15px;
+    }
+    
+    .evaluation-item {
+        padding: 10px;
+    }
+    
+    .item-label {
+        font-size: 0.8rem;
+    }
+    
+    .item-content {
+        font-size: 0.8rem;
+    }
+}

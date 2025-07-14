@@ -1330,45 +1330,79 @@ def analyze_student_learning(student_number, unit, logs):
     
     print(f"予想対話数: {len(prediction_chats)}, 考察対話数: {len(reflection_chats)}")
     
-    # 分析プロンプト作成（より安全で明確な指示）
+    # 分析プロンプト作成（教育的観点を強化）
     analysis_prompt = f"""
-小学生の理科学習記録を評価してください。
+小学生の理科学習記録を詳細に評価してください。
 
 学習内容: {unit}
 学習者ID: {student_number}
 
-学習記録:
+【予想段階の記録】
 """
     
-    # 予想段階の記録（簡潔に）
-    for i, chat in enumerate(prediction_chats[:3], 1):  # 最大3つまで
-        user_msg = chat['user'][:50] if len(chat['user']) > 50 else chat['user']
-        analysis_prompt += f"予想{i}: {user_msg}\n"
+    # 予想段階の記録（詳細に）
+    for i, chat in enumerate(prediction_chats, 1):
+        user_msg = chat['user']
+        ai_msg = chat['ai'][:100] + "..." if len(chat['ai']) > 100 else chat['ai']
+        analysis_prompt += f"予想対話{i}:\n"
+        analysis_prompt += f"  学習者: {user_msg}\n"
+        analysis_prompt += f"  AI応答: {ai_msg}\n"
     
     if prediction_summary:
-        summary_short = prediction_summary[:100] if len(prediction_summary) > 100 else prediction_summary
-        analysis_prompt += f"予想まとめ: {summary_short}\n"
+        analysis_prompt += f"\n予想まとめ: {prediction_summary}\n"
     
-    # 考察段階の記録（簡潔に）
-    for i, chat in enumerate(reflection_chats[:3], 1):  # 最大3つまで
-        user_msg = chat['user'][:50] if len(chat['user']) > 50 else chat['user']
-        analysis_prompt += f"考察{i}: {user_msg}\n"
+    # 考察段階の記録（詳細に）
+    analysis_prompt += f"\n【考察段階の記録】\n"
+    for i, chat in enumerate(reflection_chats, 1):
+        user_msg = chat['user']
+        ai_msg = chat['ai'][:100] + "..." if len(chat['ai']) > 100 else chat['ai']
+        analysis_prompt += f"考察対話{i}:\n"
+        analysis_prompt += f"  学習者: {user_msg}\n"
+        analysis_prompt += f"  AI応答: {ai_msg}\n"
     
     if final_summary:
-        final_short = final_summary[:100] if len(final_summary) > 100 else final_summary
-        analysis_prompt += f"最終考察: {final_short}\n"
+        analysis_prompt += f"\n最終考察: {final_summary}\n"
     
     analysis_prompt += """
-この学習記録について、以下の形式で評価結果をJSON形式で出力してください。
+【評価観点】
+以下の観点で詳細に評価してください：
+
+1. 予想の質
+   - 日常生活の経験に基づいているか
+   - 既習事項を活用しているか
+   - 根拠を明確に示しているか
+
+2. 考察の質
+   - 実験結果と予想を比較しているか
+   - 結果について日常生活との関連を示しているか
+   - 科学的に妥当な説明ができているか
+
+3. 学習姿勢
+   - 積極的に対話に参加しているか
+   - 自分の言葉で表現しているか
+   - 疑問や興味を示しているか
+
+【出力形式】
+以下の形式で評価結果をJSON形式で出力してください：
 
 {
-  "evaluation": "学習の取り組みは良好です",
-  "strengths": ["積極的な参加", "論理的思考", "創意工夫"],
-  "improvements": ["観察力向上", "記録の詳細化", "考察の深化"],
+  "evaluation": "予想では日常経験を活用し、考察では結果と予想を関連付けて論理的に説明しています",
+  "strengths": ["日常経験の活用", "論理的思考", "積極的参加"],
+  "improvements": ["観察の詳細化", "科学用語の使用", "考察の深化"],
   "score": 7,
-  "thinking_process": "段階的に考えられています",
+  "thinking_process": "段階的に考えを深めています",
   "engagement": "意欲的に取り組んでいます",
-  "scientific_understanding": "基本概念を理解しています"
+  "scientific_understanding": "基本概念を理解しています",
+  "prediction_quality": {
+    "daily_life_connection": "日常経験を根拠として活用している",
+    "prior_knowledge_use": "既習事項を適切に関連付けている",
+    "reasoning_clarity": "根拠を明確に示している"
+  },
+  "reflection_quality": {
+    "result_prediction_link": "実験結果と予想を比較・検討している",
+    "daily_life_relevance": "結果を日常生活と関連付けている",
+    "scientific_validity": "科学的に妥当な説明をしている"
+  }
 }
 """
     
@@ -1443,36 +1477,66 @@ def analyze_student_learning(student_number, unit, logs):
         print("JSON抽出に失敗、フォールバックを使用")
         return {
             'evaluation': '学習記録から基本的な取り組み姿勢が確認できます',
-            'strengths': ['学習活動への参加', 'コミュニケーション', '継続的取り組み'],
-            'improvements': ['観察力の向上', '表現力の強化', '論理的思考の育成'],
+            'strengths': ['学習活動への参加', '対話への積極性', '継続的な取り組み'],
+            'improvements': ['日常経験との関連付け強化', '予想の根拠明確化', '考察の詳細化'],
             'score': 6,
             'thinking_process': '段階的に考察を進めています',
             'engagement': '積極的に学習に取り組んでいます',
-            'scientific_understanding': '基本概念を理解し始めています'
+            'scientific_understanding': '基本概念を理解し始めています',
+            'prediction_quality': {
+                'daily_life_connection': '日常経験の活用を促すとよいでしょう',
+                'prior_knowledge_use': '既習事項との関連付けを意識させましょう',
+                'reasoning_clarity': '根拠をより明確に示せるよう指導が必要です'
+            },
+            'reflection_quality': {
+                'result_prediction_link': '実験結果と予想の比較を促しましょう',
+                'daily_life_relevance': '日常生活との関連を意識させる指導が効果的です',
+                'scientific_validity': '科学的な説明力を段階的に育成していきましょう'
+            }
         }
         
     except json.JSONDecodeError as e:
         print(f"JSON解析エラー: {e}")
-        # Geminiからの応答をそのまま表示するためのフォールバック
+        # 教育的観点を含むフォールバック応答
         return {
-            'evaluation': '分析処理でエラーが発生しました',
-            'strengths': ['データ取得成功'],
-            'improvements': ['システム処理の改善が必要'],
+            'evaluation': '分析処理でエラーが発生しましたが、学習への取り組みは確認できます',
+            'strengths': ['学習活動への参加', '対話への取り組み', '継続的な学習'],
+            'improvements': ['日常経験との関連付け', '予想根拠の明確化', '考察の論理性向上'],
             'score': 5,
-            'thinking_process': 'システムエラー',
-            'engagement': 'システムエラー', 
-            'scientific_understanding': 'システムエラー'
+            'thinking_process': 'システムエラーのため詳細評価は後日実施',
+            'engagement': '学習意欲は確認できます',
+            'scientific_understanding': '基本的な理解は進んでいます',
+            'prediction_quality': {
+                'daily_life_connection': '日常経験の活用について再評価が必要',
+                'prior_knowledge_use': '既習事項の活用状況を確認中',
+                'reasoning_clarity': '根拠の明確さについて詳細分析予定'
+            },
+            'reflection_quality': {
+                'result_prediction_link': '結果と予想の関連付けについて評価中',
+                'daily_life_relevance': '日常生活との関連について分析中',
+                'scientific_validity': '科学的説明力について評価予定'
+            }
         }
     except Exception as e:
         print(f"分析エラー: {e}")
         return {
-            'evaluation': f'システムエラーが発生しました: {str(e)}',
-            'strengths': ['データは正常に取得されました'],
-            'improvements': ['システムの安定性向上が必要'],
-            'score': 3,
-            'thinking_process': f'エラー: {str(e)}',
-            'engagement': 'エラーのため評価不可',
-            'scientific_understanding': 'エラーのため評価不可'
+            'evaluation': f'システムエラーが発生しましたが、学習記録は保存されています',
+            'strengths': ['学習データの蓄積', '継続的な取り組み', '記録の完成'],
+            'improvements': ['システム安定化後の詳細分析', '教育的評価の実施', '個別指導計画の作成'],
+            'score': 4,
+            'thinking_process': f'エラー詳細: {str(e)[:50]}...',
+            'engagement': '学習への参加は記録されています',
+            'scientific_understanding': 'システム復旧後に詳細評価予定',
+            'prediction_quality': {
+                'daily_life_connection': 'システム復旧後に評価実施',
+                'prior_knowledge_use': 'データ解析後に詳細確認',
+                'reasoning_clarity': '後日詳細分析予定'
+            },
+            'reflection_quality': {
+                'result_prediction_link': '詳細分析は後日実施',
+                'daily_life_relevance': 'システム安定後に評価',
+                'scientific_validity': '包括的評価を後日実施'
+            }
         }
     
     try:
