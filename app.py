@@ -155,8 +155,13 @@ def call_gemini_with_retry(prompt, max_retries=3, delay=2):
                 return cleaned_response
             else:
                 print("空の応答が返されました")
-                if response.candidates and response.candidates[0].finish_reason:
-                    print(f"終了理由: {response.candidates[0].finish_reason}")
+                if response.candidates and len(response.candidates) > 0:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'finish_reason'):
+                        print(f"終了理由: {candidate.finish_reason}")
+                    if hasattr(candidate, 'safety_ratings'):
+                        print(f"安全性評価: {candidate.safety_ratings}")
+                print(f"応答全体: {response}")
                 raise Exception("空の応答が返されました")
                 
         except Exception as e:
@@ -1317,45 +1322,52 @@ def analyze_student_learning(student_number, unit, logs):
     
     # 分析プロンプト作成
     analysis_prompt = f"""
-あなたは小学校理科の教育専門家です。以下の学習者の学習過程を分析し、評価してください。
+小学校理科の学習評価を行ってください。
 
 学習単元: {unit}
-学習者: {student_number}番
+学習者番号: {student_number}
 
-予想段階の対話:
+予想段階の学習記録:
 """
     
     for i, chat in enumerate(prediction_chats, 1):
-        analysis_prompt += f"対話{i}: 学習者「{chat['user']}」/ AI「{chat['ai']}」\n"
+        analysis_prompt += f"会話{i} - 生徒「{chat['user']}」AI「{chat['ai']}」\n"
     
     analysis_prompt += f"\n予想まとめ: {prediction_summary}\n\n"
     
-    analysis_prompt += "考察段階の対話:\n"
+    analysis_prompt += "考察段階の学習記録:\n"
     for i, chat in enumerate(reflection_chats, 1):
-        analysis_prompt += f"対話{i}: 学習者「{chat['user']}」/ AI「{chat['ai']}」\n"
+        analysis_prompt += f"会話{i} - 生徒「{chat['user']}」AI「{chat['ai']}」\n"
     
     analysis_prompt += f"\n最終考察: {final_summary}\n\n"
     
     analysis_prompt += """
-以下の観点で分析し、必ずJSON形式のみで回答してください。説明文や前置きは一切不要です。
+以下の項目で学習評価をJSONで出力してください。
+
+項目:
+- evaluation: 学習過程の総合評価（80文字程度）
+- strengths: 優れている点を3つ
+- improvements: 改善点を3つ  
+- score: 1から10の評価点
+- thinking_process: 思考過程の評価
+- engagement: 学習姿勢の評価
+- scientific_understanding: 科学的理解の評価
+
+JSON形式で回答してください。
+"""
+    
+    analysis_prompt += """
+以下のJSON形式で学習評価を出力してください:
 
 {
-  "evaluation": "学習過程の総合評価（100文字以内）",
-  "strengths": ["優れている点1", "優れている点2", "優れている点3"],
-  "improvements": ["改善点1", "改善点2", "改善点3"],
-  "score": 評価点数（1-10の整数）,
-  "thinking_process": "思考過程の評価（論理性、根拠の明確さ）",
-  "engagement": "学習への取り組み姿勢の評価",
-  "scientific_understanding": "科学的理解の深さの評価"
+  "evaluation": "総合評価コメント",
+  "strengths": ["長所1", "長所2", "長所3"],
+  "improvements": ["課題1", "課題2", "課題3"],
+  "score": 7,
+  "thinking_process": "思考評価",
+  "engagement": "取組評価", 
+  "scientific_understanding": "理解評価"
 }
-
-評価基準：
-- 思考過程：根拠を示して予想できているか
-- 積極性：自分の言葉で表現できているか
-- 理解度：実験結果と予想を適切に比較できているか
-- 論理性：日常経験と学習内容を関連付けられているか
-
-重要：必ずJSON形式でのみ回答し、マークダウン記法や説明文は使用しないでください。JSON以外の文字列は含めないでください。
 """
     
     try:
@@ -1496,40 +1508,53 @@ def analyze_class_trends(logs, unit=None):
             reflections.append(log.get('data', {}).get('final_summary', ''))
     
     analysis_prompt = f"""
-あなたは小学校理科の教育専門家です。以下のクラス全体の学習データを分析してください。
+クラス全体の学習状況を分析してください。
 
 対象単元: {unit if unit else '全単元'}
 学習者数: {len(students)}人
 
-学習状況:
+各学習者の状況:
 """
     
     for student, data in summary_data.items():
-        analysis_prompt += f"学習者{student}: 予想対話{data['prediction_count']}回, 考察対話{data['reflection_count']}回, "
-        analysis_prompt += f"予想完了{'○' if data['has_prediction'] else '×'}, 最終考察完了{'○' if data['has_final'] else '×'}\n"
+        analysis_prompt += f"学習者{student}: 予想{data['prediction_count']}回 考察{data['reflection_count']}回 "
+        analysis_prompt += f"予想完了{'○' if data['has_prediction'] else '×'} 考察完了{'○' if data['has_final'] else '×'}\n"
     
-    analysis_prompt += f"\n主な予想内容:\n"
-    for i, pred in enumerate(predictions[:5], 1):  # 最大5つまで
-        analysis_prompt += f"{i}. {pred}\n"
+    analysis_prompt += f"\n主な予想:\n"
+    for i, pred in enumerate(predictions[:3], 1):  # 最大3つまで
+        analysis_prompt += f"{i}. {pred[:50]}...\n"
     
-    analysis_prompt += f"\n主な考察内容:\n"
-    for i, ref in enumerate(reflections[:5], 1):  # 最大5つまで
-        analysis_prompt += f"{i}. {ref}\n"
+    analysis_prompt += f"\n主な考察:\n"
+    for i, ref in enumerate(reflections[:3], 1):  # 最大3つまで
+        analysis_prompt += f"{i}. {ref[:50]}...\n"
     
     analysis_prompt += """
-以下の観点で分析し、必ずJSON形式のみで回答してください。説明文や前置きは一切不要です。
+以下の項目でクラス分析をJSONで出力してください。
+
+項目:
+- overall_trend: クラス全体の傾向（100文字程度）
+- common_misconceptions: よくある誤解を3つ
+- effective_approaches: 効果的な指導法を3つ
+- recommendations: 指導提案を3つ
+- engagement_level: 取り組み度（高/中/低）
+- understanding_distribution: 理解度分布
+- improvement_areas: 重点指導分野を2つ
+
+JSON形式で回答してください。
+"""
+    
+    analysis_prompt += """
+以下のJSON形式でクラス分析を出力してください:
 
 {
-  "overall_trend": "クラス全体の学習傾向（150文字以内）",
-  "common_misconceptions": ["よくある誤解1", "よくある誤解2", "よくある誤解3"],
-  "effective_approaches": ["効果的だった指導法1", "効果的だった指導法2", "効果的だった指導法3"],
-  "recommendations": ["今後の指導提案1", "今後の指導提案2", "今後の指導提案3"],
-  "engagement_level": "学習への取り組み度（高/中/低）",
-  "understanding_distribution": "理解度の分布状況",
-  "improvement_areas": ["重点的に指導すべき分野1", "重点的に指導すべき分野2"]
+  "overall_trend": "全体的な学習傾向",
+  "common_misconceptions": ["誤解1", "誤解2", "誤解3"],
+  "effective_approaches": ["手法1", "手法2", "手法3"],
+  "recommendations": ["提案1", "提案2", "提案3"],
+  "engagement_level": "高",
+  "understanding_distribution": "分布状況",
+  "improvement_areas": ["分野1", "分野2"]
 }
-
-重要：必ずJSON形式でのみ回答し、マークダウン記法や説明文は使用しないでください。JSON以外の文字列は含めないでください。
 """
     
     try:
