@@ -576,17 +576,24 @@ def teacher():
 @require_teacher_auth
 def teacher_logs():
     """学習ログ一覧"""
-    date = request.args.get('date', datetime.now().strftime('%Y%m%d'))
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = request.args.get('date', default_date)
     unit = request.args.get('unit', '')
     student = request.args.get('student', '')
     
     logs = load_learning_logs(date)
+    print(f"ログ読み込み - 対象日付: {date}, 読み込んだログ数: {len(logs)}")
     
     # フィルタリング
     if unit:
         logs = [log for log in logs if log.get('unit') == unit]
+        print(f"単元フィルタ適用後: {len(logs)}件")
     if student:
         logs = [log for log in logs if log.get('student_number') == student]
+        print(f"学生フィルタ適用後: {len(logs)}件")
     
     # 学生ごとにグループ化
     students_data = {}
@@ -623,6 +630,7 @@ def teacher_logs():
                          current_date=date,
                          current_unit=unit,
                          current_student=student,
+                         available_dates=available_dates,
                          teacher_id=session.get('teacher_id'))
 
 @app.route('/teacher/student/<student_number>')
@@ -630,7 +638,12 @@ def teacher_logs():
 def teacher_student_detail(student_number):
     """特定の学生の詳細"""
     unit = request.args.get('unit')
-    date = request.args.get('date', datetime.now().strftime('%Y%m%d'))
+    
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = request.args.get('date', default_date)
     
     print(f"学生詳細ページ - 学生番号: {student_number}, 単元: {unit}, 日付: {date}")
     

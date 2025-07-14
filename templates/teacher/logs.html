@@ -24,9 +24,13 @@
                 <div class="row g-3">
                     <div class="col-md-3">
                         <label class="form-label">日付</label>
-                        <input type="date" class="form-control" id="dateFilter" 
-                               value="{{ current_date[:4] }}-{{ current_date[4:6] }}-{{ current_date[6:8] }}"
-                               onchange="applyFilters()">
+                        <select class="form-select" id="dateFilter" onchange="applyFilters()">
+                            {% for date_info in available_dates %}
+                            <option value="{{ date_info.raw }}" {% if current_date == date_info.raw %}selected{% endif %}>
+                                {{ date_info.formatted }}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">単元</label>
@@ -151,7 +155,7 @@
 {% block scripts %}
 <script>
 function applyFilters() {
-    const date = document.getElementById('dateFilter').value.replace(/-/g, '');
+    const date = document.getElementById('dateFilter').value;
     const unit = document.getElementById('unitFilter').value;
     const student = document.getElementById('studentFilter').value;
     
@@ -167,14 +171,17 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    document.getElementById('dateFilter').value = new Date().toISOString().slice(0,10);
+    const dateSelect = document.getElementById('dateFilter');
+    if (dateSelect.options.length > 0) {
+        dateSelect.selectedIndex = 0;
+    }
     document.getElementById('unitFilter').value = '';
     document.getElementById('studentFilter').value = '';
     applyFilters();
 }
 
 function exportCurrentData() {
-    const date = document.getElementById('dateFilter').value.replace(/-/g, '');
+    const date = document.getElementById('dateFilter').value;
     fetch(`/teacher/export?date=${date}`)
     .then(response => response.json())
     .then(data => {
