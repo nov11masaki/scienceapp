@@ -1337,7 +1337,7 @@ def analyze_student_learning(student_number, unit, logs):
     analysis_prompt += f"\n最終考察: {final_summary}\n\n"
     
     analysis_prompt += """
-以下の観点で分析し、JSON形式で回答してください：
+以下の観点で分析し、必ずJSON形式のみで回答してください。説明文や前置きは一切不要です。
 
 {
   "evaluation": "学習過程の総合評価（100文字以内）",
@@ -1355,18 +1355,43 @@ def analyze_student_learning(student_number, unit, logs):
 - 理解度：実験結果と予想を適切に比較できているか
 - 論理性：日常経験と学習内容を関連付けられているか
 
-重要：必ずJSONの形式で返答し、マークダウン記法や特殊記号は使用しないでください。
+重要：必ずJSON形式でのみ回答し、マークダウン記法や説明文は使用しないでください。JSON以外の文字列は含めないでください。
 """
     
     try:
         print("Gemini分析開始...")
         response = call_gemini_with_retry(analysis_prompt)
-        print(f"Gemini応答: {response[:200]}...")
+        print(f"Gemini応答（前500文字）: {response[:500]}")
+        print(f"Gemini応答（後500文字）: {response[-500:]}")
         
-        # JSONパースを試みる
-        result = json.loads(response)
-        print("分析完了")
-        return result
+        # 応答の中からJSONを抽出
+        import re
+        
+        # JSONが含まれているかチェック
+        json_match = re.search(r'\{.*?\}', response, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            print(f"抽出されたJSON: {json_str}")
+            try:
+                result = json.loads(json_str)
+                print("分析完了")
+                return result
+            except json.JSONDecodeError as e:
+                print(f"JSON解析エラー（抽出後）: {e}")
+        else:
+            print("JSON形式が見つかりません")
+            print(f"全応答内容: {response}")
+        
+        # フォールバック応答
+        return {
+            'evaluation': 'Geminiからの応答がJSON形式ではありませんでした',
+            'strengths': ['学習活動に参加しています'],
+            'improvements': ['システム調整後に再分析予定'],
+            'score': 5,
+            'thinking_process': 'データ解析中',
+            'engagement': 'データ解析中',
+            'scientific_understanding': 'データ解析中'
+        }
         
     except json.JSONDecodeError as e:
         print(f"JSON解析エラー: {e}")
@@ -1492,7 +1517,7 @@ def analyze_class_trends(logs, unit=None):
         analysis_prompt += f"{i}. {ref}\n"
     
     analysis_prompt += """
-以下の観点で分析し、JSON形式で回答してください：
+以下の観点で分析し、必ずJSON形式のみで回答してください。説明文や前置きは一切不要です。
 
 {
   "overall_trend": "クラス全体の学習傾向（150文字以内）",
@@ -1504,33 +1529,39 @@ def analyze_class_trends(logs, unit=None):
   "improvement_areas": ["重点的に指導すべき分野1", "重点的に指導すべき分野2"]
 }
 
-重要：必ずJSONの形式で返答し、マークダウン記法や特殊記号は使用しないでください。
+重要：必ずJSON形式でのみ回答し、マークダウン記法や説明文は使用しないでください。JSON以外の文字列は含めないでください。
 """
     
     try:
+        print("クラス分析開始...")
         analysis_result = call_gemini_with_retry(analysis_prompt)
+        print(f"クラス分析応答（前500文字）: {analysis_result[:500]}")
+        print(f"クラス分析応答（後500文字）: {analysis_result[-500:]}")
         
         # JSONパースを試行
-        try:
-            start_idx = analysis_result.find('{')
-            end_idx = analysis_result.rfind('}') + 1
-            if start_idx != -1 and end_idx != 0:
-                json_str = analysis_result[start_idx:end_idx]
+        import re
+        json_match = re.search(r'\{.*?\}', analysis_result, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            print(f"クラス分析抽出JSON: {json_str}")
+            try:
                 result = json.loads(json_str)
                 return result
-            else:
-                raise ValueError("JSON形式が見つかりません")
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"クラス分析JSON解析エラー: {e}")
-            return {
-                'overall_trend': '分析中にエラーが発生しました',
-                'common_misconceptions': ['データ解析中'],
-                'effective_approaches': ['分析システム調整中'],
-                'recommendations': ['継続的な指導'],
-                'engagement_level': '評価中',
-                'understanding_distribution': '分析中',
-                'improvement_areas': ['総合的な指導']
-            }
+            except json.JSONDecodeError as e:
+                print(f"クラス分析JSON解析エラー（抽出後）: {e}")
+        else:
+            print("クラス分析でJSON形式が見つかりません")
+            print(f"クラス分析全応答内容: {analysis_result}")
+            
+        return {
+            'overall_trend': 'AI応答がJSON形式ではありませんでした',
+            'common_misconceptions': ['データ解析中'],
+            'effective_approaches': ['システム調整中'],
+            'recommendations': ['継続的な指導'],
+            'engagement_level': '評価中',
+            'understanding_distribution': '分析中',
+            'improvement_areas': ['総合的な指導']
+        }
     except Exception as e:
         print(f"クラス分析エラー: {e}")
         return {
@@ -1547,7 +1578,11 @@ def analyze_class_trends(logs, unit=None):
 @require_teacher_auth
 def teacher_analysis():
     """学習分析ダッシュボード"""
-    date = request.args.get('date', datetime.now().strftime('%Y%m%d'))
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = request.args.get('date', default_date)
     unit = request.args.get('unit', '')
     
     logs = load_learning_logs(date)
@@ -1575,6 +1610,7 @@ def teacher_analysis():
                          units=UNITS,
                          current_date=date,
                          current_unit=unit,
+                         available_dates=available_dates,
                          teacher_id=session.get('teacher_id'))
 
 @app.route('/teacher/analysis/student')
@@ -1583,7 +1619,12 @@ def teacher_student_analysis():
     """個別学生の詳細分析"""
     student_number = request.args.get('student') or request.args.get('student_number')
     unit = request.args.get('unit')
-    date = request.args.get('date', datetime.now().strftime('%Y%m%d'))
+    
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = request.args.get('date', default_date)
     
     print(f"個別学生分析 - 学生番号: {student_number}, 単元: {unit}, 日付: {date}")
     
@@ -1621,6 +1662,7 @@ def teacher_student_analysis():
                          unit=unit,
                          logs=student_logs,
                          date=date,
+                         available_dates=available_dates,
                          teacher_id=session.get('teacher_id'))
 
 @app.route('/teacher/analysis/api/student', methods=['POST'])
@@ -1630,7 +1672,12 @@ def api_student_analysis():
     data = request.get_json()
     student_number = data.get('student_number')
     unit = data.get('unit')
-    date = data.get('date', datetime.now().strftime('%Y%m%d'))
+    
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = data.get('date', default_date)
     
     logs = load_learning_logs(date)
     analysis = analyze_student_learning(student_number, unit, logs)
@@ -1643,7 +1690,12 @@ def api_class_analysis():
     """クラス分析のAPI（AJAX用）"""
     data = request.get_json()
     unit = data.get('unit')
-    date = data.get('date', datetime.now().strftime('%Y%m%d'))
+    
+    # デフォルト日付を最新のログがある日付に設定
+    available_dates = get_available_log_dates()
+    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
+    
+    date = data.get('date', default_date)
     
     logs = load_learning_logs(date)
     analysis = analyze_class_trends(logs, unit if unit else None)

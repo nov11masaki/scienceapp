@@ -34,8 +34,13 @@
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label">日付</label>
-                    <input type="date" name="date" class="form-control" 
-                           value="{{ request.args.get('date', '') }}" onchange="this.form.submit()">
+                    <select name="date" class="form-select" onchange="this.form.submit()">
+                        {% for date_info in available_dates %}
+                        <option value="{{ date_info.raw }}" {% if current_date == date_info.raw %}selected{% endif %}>
+                            {{ date_info.formatted }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">単元</label>
