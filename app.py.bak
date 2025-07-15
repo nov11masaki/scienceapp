@@ -6,7 +6,6 @@ import json
 from datetime import datetime
 import csv
 import time
-import hashlib
 import ssl
 import certifi
 import urllib3
@@ -15,7 +14,14 @@ from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 
 # 環境変数を読み込み
-load_dotenv()
+# 開発環境でのみ .env ファイルを読み込み
+if os.path.exists('.env'):
+    load_dotenv()
+
+# Gemini APIキーを環境変数から取得
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY環境変数が設定されていません")
 
 # SSL設定の改善
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -76,7 +82,7 @@ except Exception as e:
     except Exception as e2:
         print(f"Gemini APIフォールバック設定エラー: {e2}")
 
-# モデル設定（JSON出力に最適化）
+# モデル設定（自然な文章生成に最適化）
 def create_model():
     try:
         return genai.GenerativeModel(
@@ -86,8 +92,8 @@ def create_model():
                 max_output_tokens=2000,
                 top_p=0.8,
                 top_k=20,
-                candidate_count=1,
-                response_mime_type="application/json"  # JSON形式を指定
+                candidate_count=1
+                # response_mime_type="application/json"  # JSON形式を削除して自然な文章生成
             )
         )
     except Exception as e:
@@ -117,8 +123,21 @@ if model is None:
 
 # マークダウン記法を除去する関数
 def remove_markdown_formatting(text):
-    """AIの応答からマークダウン記法を除去する"""
+    """AIの応答からマークダウン記法と装飾文字を除去する"""
     import re
+    
+    # JSON形式の装飾文字を除去
+    text = re.sub(r'^\s*\[?\s*{\s*["\']?予想["\']?\s*:\s*["\']?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\[?\s*{\s*["\']?考察["\']?\s*:\s*["\']?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\[?\s*{\s*["\']?答え["\']?\s*:\s*["\']?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^\s*\[?\s*{\s*["\']?回答["\']?\s*:\s*["\']?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'["\']?\s*}\s*\]?\s*$', '', text, flags=re.MULTILINE)
+    
+    # 接頭辞の除去
+    text = re.sub(r'^予想\s*[:：]\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^考察\s*[:：]\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^答え\s*[:：]\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^回答\s*[:：]\s*', '', text, flags=re.MULTILINE)
     
     # 太字 **text** や __text__ を通常のテキストに
     text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
@@ -167,6 +186,9 @@ def extract_message_from_json_response(response):
             # messageフィールドがある場合
             elif 'message' in parsed:
                 return parsed['message']
+            # 予想フィールドがある場合
+            elif '予想' in parsed:
+                return parsed['予想']
             else:
                 # JSONだが適切なフィールドがない場合はそのまま返す
                 return response
@@ -184,6 +206,11 @@ def extract_message_from_json_response(response):
                         return item['summary']
                     elif 'message' in item:
                         return item['message']
+                    elif '予想' in item:
+                        return item['予想']
+                    else:
+                        # 辞書の最初の値を返す
+                        return list(item.values())[0] if item else response
             return response
             
         # JSON形式でない場合はそのまま返す
@@ -578,7 +605,7 @@ def chat():
     
     # Gemini APIへのプロンプト作成（言語レベル適応型）
     system_prompt = f"""
-あなたは小学生の理科学習を支援するAIです。産婆法のような対話を通して、学習者の経験や既習事項を引き出し、根拠のある予想を立てさせることが目的です。
+あなたは小学生の理科学習を支援するAIです。産婆法のような対話を通して、学習者の日常経験や既習事項を丁寧に引き出し、それらを根拠とした予想を立てさせることが最も重要な目的です。
 
 現在の学習単元: {unit}
 課題: {task_content}
@@ -590,20 +617,32 @@ def chat():
 
 {language_style}
 
-対話ガイドライン:
-1. 学習者の答えを否定せず、「なぜそう思うのか」を聞いて根拠を探る
-2. 日常経験や既習事項と関連付けさせる質問をする
-3. 誘導的な質問は避け、学習者自身の考えを引き出す
-4. 3-4回の対話で予想をまとめられるようにする
-5. **重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
+産婆法的対話ガイドライン:
+1. 児童の身近な経験を引き出す
+   - 「お家で〜したことある？」「学校で〜を見たことある？」
+   - 「前に〜をした時、どんな感じだった？」
+2. 経験と現在の課題を結び付ける
+   - 「その時のことと今の問題、似ているところがあるかな？」
+   - 「あの時の経験から考えると、今度はどうなると思う？」
+3. 既習事項を思い出させる
+   - 「前に勉強した〜のことを思い出してみて」
+   - 「〜の時に習ったことと関係があるかな？」
+4. 言語化を支援する
+   - 児童が言いたいことを察して「〜ということかな？」
+   - 「もう少し詳しく教えて」「どんな感じだった？」
+5. 決して結論を教えず、児童の考えを尊重する
+   - 「なるほど、そう考えたんだね」
+   - 「その理由をもう少し聞かせて」
 
 対話回数: {len(conversation)}回目
 
 特別な配慮:
-- {conversation_stage}段階なので、{"基本的な質問から始める" if conversation_stage == "初期" else "より深い理解を促す" if conversation_stage == "展開" else "総合的な思考を促す"}
-- {"経験談を大切にする" if "経験" in topics else ""}
-- {"社会的な関係性を活用する" if "社会的" in topics else ""}
-- {"感情面にも配慮する" if "感情" in topics else ""}
+- {conversation_stage}段階なので、{"児童の経験を聞くことから始める" if conversation_stage == "初期" else "経験と課題を結び付ける支援をする" if conversation_stage == "展開" else "経験に基づいた予想をまとめる支援をする"}
+- {"過去の経験を大切にしながら対話する" if "経験" in topics else ""}
+- {"友達や家族との関係の中での経験も引き出す" if "社会的" in topics else ""}
+- {"楽しかった、びっくりした等の感情と一緒に経験を思い出させる" if "感情" in topics else ""}
+
+**重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
 """
     
     # 対話履歴を含めてプロンプト作成
@@ -655,17 +694,19 @@ def summary():
     conversation = session.get('conversation', [])
     unit = session.get('unit')
     
-    # 予想のまとめを生成
+    # チャット履歴から経験に基づく予想を生成
     summary_prompt = f"""
-以下の対話を基に、学習者の予想を自然な日本語で簡潔にまとめてください。
+以下の対話履歴から、学習者が自分の経験に基づいて立てた予想を、小学生の書き言葉で文章化してください。
 
-要求：
-1. 「あなたは、〜ということから、〜だと予想したんですね」の形でまとめる
-2. 学習者の根拠と予想を明確に分ける
-3. マークダウン記法（*、**、#、-など）は一切使用しない
-4. 普通の文章のみで書く
-5. 箇条書きや記号は使わない
-6. 平易な言葉を使う
+重要な要求：
+1. 学習者の実際の経験（家庭での体験、学校での体験、日常生活での観察など）を具体的に含める
+2. その経験がどのように予想の根拠となっているかを明確にする
+3. 小学生の書き言葉で丁寧語を使用する（「です」「ます」「である」調）
+4. 話し言葉（「〜だよ」「〜だね」「〜かな」）は使わない
+5. 「〜だと思います」「〜だと予想します」「〜だと考えます」などの書き言葉の推測表現を使う
+6. マークダウン記法は使わず、普通の文章で書く
+7. 「予想:」「答え:」などの装飾文字や記号は一切使わない
+8. 学習者の体験を尊重しながら、きちんとした文章にする
 
 単元: {unit}
 
@@ -683,7 +724,7 @@ def summary():
         
         session['prediction_summary'] = summary_text
         
-        # 予想まとめのログを保存
+        # 予想段階のチャット履歴要約のログを保存
         save_learning_log(
             student_number=session.get('student_number'),
             unit=unit,
@@ -696,8 +737,8 @@ def summary():
         
         return jsonify({'summary': summary_text})
     except Exception as e:
-        print(f"まとめエラー: {str(e)}")
-        return jsonify({'error': f'まとめ生成中にエラーが発生しました。'}), 500
+        print(f"チャット履歴要約エラー: {str(e)}")
+        return jsonify({'error': f'チャット履歴要約生成中にエラーが発生しました。'}), 500
 
 @app.route('/experiment')
 def experiment():
@@ -723,18 +764,34 @@ def reflect_chat():
     
     # 考察支援プロンプト
     system_prompt = f"""
-あなたは小学生の理科学習における考察を支援するAIです。実験結果と予想を比較し、日常生活と関連付けた考察を作らせることが目的です。
+あなたは小学生の理科学習における考察を支援するAIです。産婆法的対話を通して、実験結果と予想を比較し、児童の日常経験や既習事項と関連付けた考察を作らせることが最も重要な目的です。
 
 学習単元: {unit}
-予想: {prediction_summary}
+予想段階での会話内容: {prediction_summary}
 
-以下のガイドラインに従って対話してください：
-1. 実験結果を具体的に言語化させる
-2. 予想と結果の違いを明確にさせる
-3. 日常生活での経験と関連付けさせる
-4. 最終的に「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」の形でまとめられるようにする
+産婆法的考察支援ガイドライン：
+1. 実験結果を児童の言葉で言語化させる
+   - 「実験をしてみて、どんなことが分かった？」
+   - 「何が一番びっくりした？」「どんな感じだった？」
+2. 予想と結果を比較させる
+   - 「最初に考えていたことと比べてみて、どうだった？」
+   - 「予想通りだった部分と違った部分があるかな？」
+3. 日常経験と結び付けさせる
+   - 「この結果を見て、お家で経験したことを思い出さない？」
+   - 「普段の生活で、同じようなことを見たことがあるかな？」
+4. 既習事項を思い出させる
+   - 「前に勉強したことと関係があるかな？」
+   - 「これまで学んだことから考えると、どうしてこうなったと思う？」
+5. 言語化を支援する
+   - 児童が言いたいことを察して「〜ということかな？」
+   - 「その気持ち、よく分かるよ。もう少し詳しく教えて」
+6. 決して結論を教えず、児童の考えを尊重する
+   - 「なるほど、そう考えたんだね」
+   - 「その経験から、そう思ったんだね」
 
 対話回数: {len(reflection_conversation)}回目
+
+**重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
 """
     
     # 対話履歴を含めてプロンプト作成
@@ -780,19 +837,22 @@ def final_summary():
     reflection_conversation = session.get('reflection_conversation', [])
     prediction_summary = session.get('prediction_summary', '')
     
-    # 最終まとめを生成
+    # 最終考察を生成
     final_prompt = f"""
-以下の対話を基に、定型文に従って考察を自然な日本語でまとめてください。
+以下の予想段階と考察段階の対話履歴から、学習者の経験に基づいた学習の流れを、学習者の言葉で自然に文章化してください。
 
-要求：
-1. 定型文の形式を守る：「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」
-2. マークダウン記法（*、**、#、-など）は一切使用しない
-3. 普通の文章のみで書く
-4. 箇条書きや記号は使わない
+重要な要求：
+1. 予想段階で引き出された具体的な経験を含める
+2. 考察段階での実験結果と予想の比較を含める
+3. 学習者の気づきや発見を学習者の言葉で表現する
+4. 経験と学習内容がどのように結び付いたかを示す
+5. 小学生らしい素直な表現で書く
+6. マークダウン記法は使わず、普通の文章で書く
+7. 学習者の成長や理解の深化が分かるように書く
 
-予想: {prediction_summary}
+予想段階での経験に基づく予想: {prediction_summary}
 
-対話履歴:
+考察段階での対話履歴:
 """
     for msg in reflection_conversation:
         role = "学習者" if msg['role'] == 'user' else "AI"
@@ -807,7 +867,7 @@ def final_summary():
         # マークダウン記法を除去
         final_summary_text = remove_markdown_formatting(final_summary_text)
         
-        # 最終考察のログを保存
+        # 最終段階のチャット履歴要約のログを保存
         save_learning_log(
             student_number=session.get('student_number'),
             unit=session.get('unit'),
@@ -821,8 +881,8 @@ def final_summary():
         
         return jsonify({'summary': final_summary_text})
     except Exception as e:
-        print(f"最終まとめエラー: {str(e)}")
-        return jsonify({'error': f'最終まとめ生成中にエラーが発生しました。'}), 500
+        print(f"最終チャット履歴要約エラー: {str(e)}")
+        return jsonify({'error': f'最終チャット履歴要約生成中にエラーが発生しました。'}), 500
 
 # 教員用ルート
 @app.route('/teacher/login', methods=['GET', 'POST'])
@@ -1100,390 +1160,181 @@ def teacher_export():
 def get_chat_suggestions():
     """対話の文脈に応じた選択肢を生成する"""
     try:
-        # リクエストデータの確認
-        data = request.get_json() or {}
         conversation = session.get('conversation', [])
         unit = session.get('unit', '理科')
-        is_regenerate = data.get('regenerate', False)  # 再生成フラグ
         
         # 最新のAI応答を取得
         latest_ai_response = ""
         if conversation and len(conversation) > 0:
             latest_ai_response = conversation[-1].get('content', '') if conversation[-1].get('role') == 'assistant' else ""
         
-        # 対話が少ない場合は基本的な選択肢を返す
+        # 対話が少ない場合の基本選択肢
         if len(conversation) < 2:
-            default_suggestions = [
-                "どのような結果になると思いますか？",
-                "理由も教えてください",
-                "他にも考えられることはありますか？"
+            basic_suggestions = [
+                "わからない",
+                "考えてみる", 
+                "教えてほしい"
             ]
-            return jsonify({
-                'suggestions': default_suggestions
-            })
+            return jsonify({'suggestions': basic_suggestions})
         
-        # 文脈とレベル分析
-        context_analysis = generate_contextual_suggestions(conversation, unit, latest_ai_response, is_regenerate)
-        language_level = context_analysis['language_level']
-        conversation_stage = context_analysis['conversation_stage']
-        topics = context_analysis['topics']
-        
-        # AIの質問タイプを分析
-        question_type = "一般"
-        if any(word in latest_ai_response for word in ["どうして", "なぜ", "理由"]):
-            question_type = "理由"
-        elif any(word in latest_ai_response for word in ["どんな", "どのような"]):
-            question_type = "描写"
-        elif any(word in latest_ai_response for word in ["他に", "ほか", "別"]):
-            question_type = "追加"
-        elif any(word in latest_ai_response for word in ["いつ", "どこで"]):
-            question_type = "状況"
-        
-        # レベル別選択肢生成プロンプト
+        # 簡潔な選択肢生成プロンプト
         suggestions_prompt = f"""
-あなたは小学校理科の指導者です。児童の言語レベルと対話文脈に応じて、適切な選択肢を3つ生成してください。
+小学生が「{latest_ai_response}」という質問に対して、自然に答えやすい選択肢を3つ作ってください。
 
-児童の分析結果:
-- 言語レベル: {language_level}
-- 対話段階: {conversation_stage}
-- 関心話題: {', '.join(topics) if topics else 'なし'}
-- AI質問タイプ: {question_type}
+条件：
+1. 単元「{unit}」に関連する内容
+2. 小学生が実際に体験したことがありそうな具体例
+3. 短くて分かりやすい表現（15文字以内）
+4. 「〜だと思う」「〜かもしれない」などの推測表現を使用
 
-単元: {unit}
-直前のAI応答: {latest_ai_response}
+例：
+質問「どんなときにあたたかいと感じましたか？」
+→ 選択肢1: おひさまがあたったとき
+→ 選択肢2: ストーブのそばにいたとき  
+→ 選択肢3: はしったあと
 
-最近の対話履歴:
+質問「なぜそう思いましたか？」
+→ 選択肢1: まえにみたことがあるから
+→ 選択肢2: おかあさんがいってたから
+→ 選択肢3: なんとなくそう思った
+
+現在の質問「{latest_ai_response}」に対する3つの選択肢を作ってください。
+選択肢1: 
+選択肢2: 
+選択肢3: 
 """
         
-        # 最新の対話を含める
-        recent_conversation = conversation[-6:] if len(conversation) > 6 else conversation
-        for msg in recent_conversation:
-            role = "学習者" if msg['role'] == 'user' else "AI"
-            suggestions_prompt += f"{role}: {msg['content']}\n"
-        
-        # レベル別の選択肢生成指示
-        if language_level == "基本":
-            suggestions_prompt += f"""
-基本レベル選択肢生成指示:
-1. ひらがな中心で簡単な言葉を使用
-2. 15文字以内の短い選択肢
-3. 身近な体験に関連した内容
-4. 「〜したことがある」「〜を見たことがある」形式を多用
-
-{question_type}タイプの質問への基本レベル選択肢例:
-理由タイプ → "まえにみたから" "おかあさんがいってたから" "なんとなく"
-描写タイプ → "おおきくなる" "あたたかくなる" "やわらかくなる"
-追加タイプ → "ほかはわからない" "もうない" "かんがえてみる"
-"""
-        elif language_level == "中級":
-            suggestions_prompt += f"""
-中級レベル選択肢生成指示:
-1. 適度な漢字を含む自然な文
-2. 20文字程度の選択肢
-3. 学校や友達の経験を含める
-4. 簡単な因果関係を表現
-
-{question_type}タイプの質問への中級レベル選択肢例:
-理由タイプ → "学校で習ったから" "友達と話していて気づいたから" "実際に見て確かめたから"
-描写タイプ → "温度が上がって大きくなる" "熱くなって変化する" "膨らんで見える"
-追加タイプ → "他の場面でも同じことが起きる" "違う条件だと結果が変わる" "詳しく調べてみたい"
-"""
-        else:  # 高級
-            suggestions_prompt += f"""
-高級レベル選択肢生成指示:
-1. 科学用語を適切に使用
-2. 25文字程度の詳しい選択肢
-3. 論理的思考を促す内容
-4. 複数の観点や比較を含める
-
-{question_type}タイプの質問への高級レベル選択肢例:
-理由タイプ → "分子の運動が活発になるから" "以前の実験結果と一致するから" "科学的根拠に基づいて"
-描写タイプ → "温度上昇により分子間距離が拡大" "熱エネルギーによる体積変化" "物質の状態変化が観察される"
-追加タイプ → "他の物質でも同様の現象が起こる" "条件を変えた場合の結果を予測" "実験方法を改良して確認"
-"""
-        
-        # 再生成の場合の追加指示
-        if is_regenerate:
-            suggestions_prompt += """
-再生成特別指示:
-- 前回とは全く異なる視点から選択肢を作成
-- より具体的で個人的な体験を含める
-- 感情や感覚を表現できる選択肢も含める
-"""
-        
-        suggestions_prompt += """
-出力形式:
-選択肢1: [内容]
-選択肢2: [内容]
-選択肢3: [内容]
-
-注意: 児童の言語レベルに完全に合わせた表現で、自然で使いやすい選択肢を作成してください。
-"""
-        
-        suggestions_response = call_gemini_with_retry(suggestions_prompt)
-        
-        # JSON形式のレスポンスの場合は解析
-        suggestions_text = extract_message_from_json_response(suggestions_response)
-        
-        # レスポンスから選択肢を抽出
-        suggestions = []
-        lines = suggestions_text.split('\n')
-        for line in lines:
-            if line.startswith('選択肢'):
-                # "選択肢1: " の部分を除去
-                suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-                if suggestion and len(suggestion) <= 50:  # 長すぎる選択肢を除外
-                    suggestions.append(suggestion)
-        
-        # 選択肢が3つ未満の場合は言語レベルに応じたデフォルトを追加
-        if len(suggestions) < 3:
-            # 言語レベルに応じたデフォルト選択肢
-            if language_level == "基本":
-                if question_type == "理由":
-                    context_defaults = ["まえにみたから", "おうちでならったから", "なんとなく"]
-                elif question_type == "描写":
-                    context_defaults = ["おおきくなる", "あたたかくなる", "かわる"]
-                elif question_type == "追加":
-                    context_defaults = ["もうない", "わからない", "かんがえてみる"]
-                else:
-                    context_defaults = ["はい", "わからない", "きいてみる"]
-            elif language_level == "中級":
-                if question_type == "理由":
-                    context_defaults = ["前に経験したから", "学校で習ったから", "友達と話したから"]
-                elif question_type == "描写":
-                    context_defaults = ["温度が上がる", "体積が変わる", "様子が変化する"]
-                elif question_type == "追加":
-                    context_defaults = ["他にも考えられる", "よくわからない", "確認したい"]
-                else:
-                    context_defaults = ["そう思う", "よくわからない", "確認したい"]
-            else:  # 高級
-                if question_type == "理由":
-                    context_defaults = ["科学的根拠に基づいて", "実験結果から推測して", "理論的に考えて"]
-                elif question_type == "描写":
-                    context_defaults = ["分子運動の活発化", "熱エネルギーの影響", "物理的性質の変化"]
-                elif question_type == "追加":
-                    context_defaults = ["複数の要因が考えられる", "さらに詳しく分析が必要", "実験で検証したい"]
-                else:
-                    context_defaults = ["さらに詳しく分析", "別の観点から検証", "実験で確認"]
+        try:
+            response = call_gemini_with_retry(suggestions_prompt)
             
-            for i, default in enumerate(context_defaults):
-                if len(suggestions) <= i:
-                    suggestions.append(default)
-        
-        return jsonify({
-            'suggestions': suggestions[:3],  # 最大3つまで
-            'regenerated': is_regenerate,
-            'language_level': language_level,
-            'context': {
-                'stage': conversation_stage,
-                'topics': topics,
-                'question_type': question_type
-            }
-        })
+            # 選択肢を抽出
+            suggestions = []
+            lines = response.split('\n')
+            for line in lines:
+                if line.strip().startswith('選択肢'):
+                    # 「選択肢1: 」の部分を除去
+                    suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
+                    if suggestion:
+                        suggestions.append(suggestion)
+            
+            # 選択肢が3つ取得できない場合のフォールバック
+            if len(suggestions) < 3:
+                suggestions = [
+                    "わからない",
+                    "考えてみる",
+                    "教えてほしい"
+                ]
+            
+            return jsonify({'suggestions': suggestions[:3]})
+            
+        except Exception as e:
+            print(f"選択肢生成エラー: {str(e)}")
+            # エラー時のフォールバック選択肢
+            fallback_suggestions = [
+                "わからない",
+                "考えてみる",
+                "教えてほしい"
+            ]
+            return jsonify({'suggestions': fallback_suggestions})
         
     except Exception as e:
-        print(f"選択肢生成エラー: {str(e)}")
-        # エラー時はデフォルトの選択肢を返す
-        default_suggestions = [
-            "そう思う",
-            "よくわからない",
-            "もう少し教えて"
-        ]
-        return jsonify({
-            'suggestions': default_suggestions
-        })
+        print(f"選択肢取得エラー: {str(e)}")
+        return jsonify({'suggestions': ["わからない", "考えてみる", "教えてほしい"]})
+
+def generate_unit_specific_suggestions(unit):
+    """単元に応じた基本的な選択肢を生成"""
+    unit_suggestions = {
+        "空気の温度と体積": ["あたたかくなると大きくなる", "つめたくなると小さくなる", "わからない"],
+        "水の温度と体積": ["お湯はふくらむ", "つめたいと小さくなる", "変わらない"],
+        "金属の温度と体積": ["あたためると大きくなる", "冷やすと小さくなる", "わからない"]
+    }
+    
+    return unit_suggestions.get(unit, ["そう思う", "わからない", "考えてみる"])
 
 @app.route('/reflection/suggestions', methods=['POST'])
 def get_reflection_suggestions():
     """考察対話の文脈に応じた選択肢を生成する"""
     try:
-        # リクエストデータの確認
-        data = request.get_json() or {}
         reflection_conversation = session.get('reflection_conversation', [])
         unit = session.get('unit', '理科')
-        is_regenerate = data.get('regenerate', False)  # 再生成フラグ
         
         # 最新のAI応答を取得
         latest_ai_response = ""
         if reflection_conversation and len(reflection_conversation) > 0:
             latest_ai_response = reflection_conversation[-1].get('content', '') if reflection_conversation[-1].get('role') == 'assistant' else ""
         
-        # 対話が少ない場合は基本的な選択肢を返す
+        # 対話が少ない場合の基本選択肢
         if len(reflection_conversation) < 2:
-            default_suggestions = [
-                "予想通りの結果でした",
-                "予想と違う結果でした",
-                "よくわからない結果でした"
+            basic_suggestions = [
+                "予想通りでした",
+                "予想と違いました",
+                "よくわかりませんでした"
             ]
-            return jsonify({
-                'suggestions': default_suggestions
-            })
+            return jsonify({'suggestions': basic_suggestions})
         
-        # 全体の対話履歴から言語レベルを分析（予想段階+考察段階）
-        conversation = session.get('conversation', [])
-        all_conversation = conversation + reflection_conversation
-        context_analysis = generate_contextual_suggestions(all_conversation, unit, latest_ai_response, is_regenerate)
-        language_level = context_analysis['language_level']
-        conversation_stage = "考察段階"
-        topics = context_analysis['topics']
-        
-        # AIの質問タイプを分析（考察段階用）
-        question_type = "一般"
-        if any(word in latest_ai_response for word in ["結果", "実験"]):
-            question_type = "結果確認"
-        elif any(word in latest_ai_response for word in ["予想", "思っていた"]):
-            question_type = "予想比較"
-        elif any(word in latest_ai_response for word in ["どうして", "なぜ", "理由"]):
-            question_type = "理由"
-        elif any(word in latest_ai_response for word in ["感じ", "思う"]):
-            question_type = "感想"
-        
-        # 再生成の場合は異なるアプローチで選択肢を生成
-        if is_regenerate:
-            suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、先ほどとは違う視点から学習者（小学生）が答えやすい具体的な選択肢を3つ生成してください。
+        # 簡潔な考察選択肢生成プロンプト
+        suggestions_prompt = f"""
+小学生が考察段階で「{latest_ai_response}」という質問に対して、自然に答えやすい選択肢を3つ作ってください。
 
-単元: {unit}
-
-直前のAI応答:
-{latest_ai_response}
-
-考察対話履歴:
-"""
-            # 最新の4往復分の対話を含める（前回より多く）
-            recent_conversation = reflection_conversation[-8:] if len(reflection_conversation) > 8 else reflection_conversation
-            for msg in recent_conversation:
-                role = "学習者" if msg['role'] == 'user' else "AI"
-                suggestions_prompt += f"{role}: {msg['content']}\n"
-            
-            suggestions_prompt += """
-再生成要求（考察段階）:
-1. 前回とは異なる角度から考察用選択肢を作成
-2. 実験結果と予想の比較に関する具体的な選択肢
-3. 感想や驚きを表現できる選択肢も含める
-4. 日常生活との関連を考えられる選択肢
-5. 各選択肢は30文字以内で分かりやすく
-6. 以下の形式で出力してください：
-
-選択肢1: [内容]
-選択肢2: [内容]  
-選択肢3: [内容]
-
-例（再生成版）：
-→ 選択肢1: 思っていたよりもはっきりした変化でした
-→ 選択肢2: 予想していた通りで嬉しかったです  
-→ 選択肢3: 普段の生活でも似たことがありそうです
-"""
-        else:
-            # 通常の考察用選択肢生成プロンプト
-            suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、直前のAI応答に対して学習者（小学生）が次に答えやすい具体的な選択肢を3つ生成してください。
-
-単元: {unit}
-
-直前のAI応答:
-{latest_ai_response}
-
-考察対話履歴:
-"""
-            
-            # 最新の3往復分の対話を含める
-            recent_conversation = reflection_conversation[-6:] if len(reflection_conversation) > 6 else reflection_conversation
-            for msg in recent_conversation:
-                role = "学習者" if msg['role'] == 'user' else "AI"
-                suggestions_prompt += f"{role}: {msg['content']}\n"
-            
-            suggestions_prompt += """
-要求（考察段階）:
-1. 直前のAI応答の内容に直接関連した選択肢を作成
-2. 実験結果に対する考察や感想を表現できる選択肢
-3. 各選択肢は25文字以内で簡潔に
-4. 予想と結果の比較ができる選択肢
-5. 具体的で学習者が答えやすい内容
-6. 以下の形式で出力してください：
-
-選択肢1: [内容]
-選択肢2: [内容]  
-選択肢3: [内容]
+条件：
+1. 単元「{unit}」の実験結果についての考察
+2. 実験結果と予想の比較を表現
+3. 短くて分かりやすい表現（20文字以内）
+4. 小学生らしい素直な感想や気づき
 
 例：
-→ 選択肢1: 予想通りの結果でした
-→ 選択肢2: 予想と少し違いました  
-→ 選択肢3: 予想と全然違いました
+質問「実験をしてみて、どんなことがわかりましたか？」
+→ 選択肢1: 予想通りでした
+→ 選択肢2: 予想と少し違いました
+→ 選択肢3: びっくりしました
+
+質問「どうしてそうなったと思いますか？」
+→ 選択肢1: 温度が関係していると思います
+→ 選択肢2: 空気が動いたからだと思います
+→ 選択肢3: よくわからないです
+
+現在の質問「{latest_ai_response}」に対する3つの選択肢を作ってください。
+選択肢1: 
+選択肢2: 
+選択肢3: 
 """
         
-        suggestions_response = call_gemini_with_retry(suggestions_prompt)
-        
-        # レスポンスから選択肢を抽出
-        suggestions = []
-        lines = suggestions_response.split('\n')
-        for line in lines:
-            if line.startswith('選択肢'):
-                suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-                if suggestion and len(suggestion) <= 50:
-                    suggestions.append(suggestion)
-        
-        # 選択肢が3つ未満の場合は文脈に応じたデフォルトを追加
-        if len(suggestions) < 3:
-            if "結果" in latest_ai_response or "どうだった" in latest_ai_response:
-                if is_regenerate:
-                    context_defaults = [
-                        "とても興味深い結果でした",
-                        "思ったより分かりやすい変化でした",
-                        "もう一度確かめてみたいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "予想通りでした",
-                        "予想と違いました",
-                        "よくわかりませんでした"
-                    ]
-            elif "どう思う" in latest_ai_response or "感想" in latest_ai_response:
-                if is_regenerate:
-                    context_defaults = [
-                        "理科って面白いなと思いました",
-                        "もっと詳しく知りたくなりました",
-                        "日常生活でも気をつけて見てみたいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "面白かった",
-                        "勉強になった",
-                        "驚いた"
-                    ]
-            else:
-                if is_regenerate:
-                    context_defaults = [
-                        "実際に見てみて理解が深まりました",
-                        "予想を立てるのは難しかったです",
-                        "次はもっと正確に予想したいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "そう思います",
-                        "よくわかりません",
-                        "もう少し考えてみます"
-                    ]
+        try:
+            response = call_gemini_with_retry(suggestions_prompt)
             
-            for i, default in enumerate(context_defaults):
-                if len(suggestions) <= i:
-                    suggestions.append(default)
-        
-        return jsonify({
-            'suggestions': suggestions[:3],
-            'regenerated': is_regenerate
-        })
+            # 選択肢を抽出
+            suggestions = []
+            lines = response.split('\n')
+            for line in lines:
+                if line.strip().startswith('選択肢'):
+                    # 「選択肢1: 」の部分を除去
+                    suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
+                    if suggestion:
+                        suggestions.append(suggestion)
+            
+            # 選択肢が3つ取得できない場合のフォールバック
+            if len(suggestions) < 3:
+                suggestions = [
+                    "予想通りでした",
+                    "予想と違いました",
+                    "よくわかりませんでした"
+                ]
+            
+            return jsonify({'suggestions': suggestions[:3]})
+            
+        except Exception as e:
+            print(f"考察選択肢生成エラー: {str(e)}")
+            # エラー時のフォールバック選択肢
+            fallback_suggestions = [
+                "予想通りでした",
+                "予想と違いました",
+                "よくわかりませんでした"
+            ]
+            return jsonify({'suggestions': fallback_suggestions})
         
     except Exception as e:
-        print(f"考察選択肢生成エラー: {str(e)}")
-        default_suggestions = [
-            "予想通りでした",
-            "予想と違いました", 
-            "よくわかりませんでした"
-        ]
-        return jsonify({
-            'suggestions': default_suggestions
-        })
+        print(f"考察選択肢取得エラー: {str(e)}")
+        return jsonify({'suggestions': ["予想通りでした", "予想と違いました", "よくわかりませんでした"]})
         
         # 選択肢生成用のプロンプト（文脈重視）
         suggestions_prompt = f"""
@@ -1820,7 +1671,7 @@ def analyze_student_learning(student_number, unit, logs):
 """
     
     analysis_prompt += """
-以下のJSON形式で学習評価を出力してください:
+以下のJSON形式で学習評価を出力してください。
 
 {
   "evaluation": "総合評価コメント",
@@ -1903,81 +1754,22 @@ def analyze_student_learning(student_number, unit, logs):
             },
             'reflection_quality': {
                 'result_prediction_link': '実験結果と予想の比較を促しましょう',
-                'daily_life_relevance': '日常生活との関連を意識させる指導が効果的です',
+                'daily_life_relevance': '結果を日常生活と関連付ける指導が効果的です',
                 'scientific_validity': '科学的な説明力を段階的に育成していきましょう'
             }
         }
-        
     except json.JSONDecodeError as e:
         print(f"JSON解析エラー: {e}")
         # 教育的観点を含むフォールバック応答
         return {
             'evaluation': '分析処理でエラーが発生しましたが、学習への取り組みは確認できます',
-            'strengths': ['学習活動への参加', '対話への取り組み', '継続的な学習'],
-            'improvements': ['日常経験との関連付け', '予想根拠の明確化', '考察の論理性向上'],
+            'strengths': ['分析データを確認中'],
+            'improvements': ['システム側で調整が必要'],
             'score': 5,
-            'thinking_process': 'システムエラーのため詳細評価は後日実施',
-            'engagement': '学習意欲は確認できます',
-            'scientific_understanding': '基本的な理解は進んでいます',
-            'prediction_quality': {
-                'daily_life_connection': '日常経験の活用について再評価が必要',
-                'prior_knowledge_use': '既習事項の活用状況を確認中',
-                'reasoning_clarity': '根拠の明確さについて詳細分析予定'
-            },
-            'reflection_quality': {
-                'result_prediction_link': '結果と予想の関連付けについて評価中',
-                'daily_life_relevance': '日常生活との関連について分析中',
-                'scientific_validity': '科学的説明力について評価予定'
-            }
+            'thinking_process': '評価中',
+            'engagement': '評価中',
+            'scientific_understanding': '評価中'
         }
-    except Exception as e:
-        print(f"分析エラー: {e}")
-        return {
-            'evaluation': f'システムエラーが発生しましたが、学習記録は保存されています',
-            'strengths': ['学習データの蓄積', '継続的な取り組み', '記録の完成'],
-            'improvements': ['システム安定化後の詳細分析', '教育的評価の実施', '個別指導計画の作成'],
-            'score': 4,
-            'thinking_process': f'エラー詳細: {str(e)[:50]}...',
-            'engagement': '学習への参加は記録されています',
-            'scientific_understanding': 'システム復旧後に詳細評価予定',
-            'prediction_quality': {
-                'daily_life_connection': 'システム復旧後に評価実施',
-                'prior_knowledge_use': 'データ解析後に詳細確認',
-                'reasoning_clarity': '後日詳細分析予定'
-            },
-            'reflection_quality': {
-                'result_prediction_link': '詳細分析は後日実施',
-                'daily_life_relevance': 'システム安定後に評価',
-                'scientific_validity': '包括的評価を後日実施'
-            }
-        }
-    
-    try:
-        analysis_result = call_gemini_with_retry(analysis_prompt)
-        
-        # JSONパースを試行
-        try:
-            # JSONの前後の余分なテキストを除去
-            start_idx = analysis_result.find('{')
-            end_idx = analysis_result.rfind('}') + 1
-            if start_idx != -1 and end_idx != 0:
-                json_str = analysis_result[start_idx:end_idx]
-                result = json.loads(json_str)
-                return result
-            else:
-                raise ValueError("JSON形式が見つかりません")
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"JSON解析エラー: {e}")
-            print(f"レスポンス: {analysis_result}")
-            return {
-                'evaluation': '分析中にエラーが発生しました',
-                'strengths': ['分析データを確認中'],
-                'improvements': ['システム側で調整が必要'],
-                'score': 5,
-                'thinking_process': '評価中',
-                'engagement': '評価中',
-                'scientific_understanding': '評価中'
-            }
     except Exception as e:
         print(f"分析エラー: {e}")
         return {
@@ -2006,9 +1798,30 @@ def analyze_class_trends(logs, unit=None):
     if not unit_logs or len(students) == 0:
         return {
             'overall_trend': '分析対象のデータがありません',
-            'common_misconceptions': [],
-            'effective_approaches': [],
-            'recommendations': []
+            'prediction_distribution': {
+                '日常経験型': ['データなし'],
+                '学校経験型': ['データなし'],
+                'メディア経験型': ['データなし'],
+                '想像・推測型': ['データなし']
+            },
+            'experience_based_patterns': ['データが不足しています'],
+            'misconception_sources': ['データが不足しています'],
+            'engagement_level': 'データなし',
+            'understanding_distribution': 'データが不足しています',
+            'visual_data': {
+                'prediction_types': {
+                    '日常経験型': 0,
+                    '学校経験型': 0,
+                    'メディア経験型': 0,
+                    '想像・推測型': 0
+                },
+                'experience_sources': {
+                    '家庭': 0,
+                    '学校': 0,
+                    'メディア': 0,
+                    'その他': 0
+                }
+            }
         }
     
     # 指導案の内容を取得（特定単元の場合）
@@ -2079,12 +1892,12 @@ def analyze_class_trends(logs, unit=None):
 
 項目:
 - overall_trend: クラス全体の傾向（100文字程度）
-- common_misconceptions: よくある誤解を3つ
-- effective_approaches: 効果的な指導法を3つ
-- recommendations: 指導提案を3つ
+- prediction_distribution: 各単元での予想の分布（経験に基づく分類）
+- experience_based_patterns: 経験に基づく予想パターン（具体的な体験事例）
+- misconception_sources: 誤解の発生源（どんな経験から生じているか）
 - engagement_level: 取り組み度（高/中/低）
 - understanding_distribution: 理解度分布
-- improvement_areas: 重点指導分野を2つ
+- visual_data: ビジュアル化用のデータ（予想分布のグラフ用）
 
 JSON形式で回答してください。
 """
@@ -2094,6 +1907,39 @@ JSON形式で回答してください。
 
 {
   "overall_trend": "クラス全体で積極的に学習に取り組んでいます",
+  "prediction_distribution": {
+    "日常経験型": ["お家で見たことがある", "料理で見たことがある"],
+    "学校経験型": ["理科室で実験した", "前の授業で習った"],
+    "メディア経験型": ["テレビで見た", "本で読んだ"],
+    "想像・推測型": ["なんとなく", "たぶん"]
+  },
+  "experience_based_patterns": [
+    "家庭での料理体験に基づく予想が多い",
+    "テレビ番組の影響による予想が見られる",
+    "過去の実験体験を活用した予想がある"
+  ],
+  "misconception_sources": [
+    "日常生活での不完全な観察",
+    "メディア情報の断片的理解",
+    "類似現象との混同"
+  ],
+  "engagement_level": "高",
+  "understanding_distribution": "理解度に個人差が見られます",
+  "visual_data": {
+    "prediction_types": {
+      "日常経験型": 30,
+      "学校経験型": 25,
+      "メディア経験型": 20,
+      "想像・推測型": 25
+    },
+    "experience_sources": {
+      "家庭": 35,
+      "学校": 30,
+      "メディア": 20,
+      "その他": 15
+    }
+  }
+}
   "common_misconceptions": ["基本概念の混同", "観察結果の解釈", "予想と結果の関連"],
   "effective_approaches": ["体験的学習", "対話型指導", "段階的説明"],
   "recommendations": ["個別指導強化", "実験機会増加", "振り返り時間確保"],
@@ -2104,17 +1950,17 @@ JSON形式で回答してください。
 """
     
     try:
-        print("クラス分析開始...")
-        analysis_result = call_gemini_with_retry(analysis_prompt)
-        print(f"クラス分析応答（前500文字）: {repr(analysis_result[:500])}")
-        print(f"クラス分析応答（後500文字）: {repr(analysis_result[-500:])}")
+        print("Geminiクラス分析開始...")
+        response = call_gemini_with_retry(analysis_prompt)
+        print(f"Geminiクラス分析応答（前500文字）: {repr(response[:500])}")
+        print(f"Geminiクラス分析応答（後500文字）: {repr(response[-500:])}")
         
         # 複数の方法でJSONを抽出
         result = None
         
         # 方法1: 通常の正規表現
         import re
-        json_match = re.search(r'\{.*?\}', analysis_result, re.DOTALL)
+        json_match = re.search(r'\{.*?\}', response, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
             print(f"クラス分析抽出JSON: {json_str}")
@@ -2126,7 +1972,7 @@ JSON形式で回答してください。
         
         # 方法2: 複数行JSON抽出
         if not result:
-            lines = analysis_result.split('\n')
+            lines = response.split('\n')
             json_lines = []
             in_json = False
             brace_count = 0
@@ -2160,23 +2006,67 @@ JSON形式で回答してください。
         print("クラス分析JSON抽出に失敗、フォールバックを使用")
         return {
             'overall_trend': 'クラス全体として理科学習に意欲的に取り組んでいます',
-            'common_misconceptions': ['実験結果の解釈', '科学的概念の理解', '観察と推論の区別'],
-            'effective_approaches': ['実体験による学習', '対話的な授業', '段階的な説明'],
-            'recommendations': ['個別サポートの充実', '実験時間の確保', '振り返り活動の強化'],
+            'prediction_distribution': {
+                '日常経験型': ['お家で見たことがある', '料理で見たことがある'],
+                '学校経験型': ['理科室で実験した', '前の授業で習った'],
+                'メディア経験型': ['テレビで見た', '本で読んだ'],
+                '想像・推測型': ['なんとなく', 'たぶん']
+            },
+            'experience_based_patterns': [
+                '家庭での料理体験に基づく予想が多い',
+                'テレビ番組の影響による予想が見られる',
+                '過去の実験体験を活用した予想がある'
+            ],
+            'misconception_sources': [
+                '日常生活での不完全な観察',
+                'メディア情報の断片的理解',
+                '類似現象との混同'
+            ],
             'engagement_level': '高',
             'understanding_distribution': '理解度に個人差が見られます',
-            'improvement_areas': ['観察技能の向上', '科学的思考力の育成']
+            'visual_data': {
+                'prediction_types': {
+                    '日常経験型': 30,
+                    '学校経験型': 25,
+                    'メディア経験型': 20,
+                    '想像・推測型': 25
+                },
+                'experience_sources': {
+                    '家庭': 35,
+                    '学校': 30,
+                    'メディア': 20,
+                    'その他': 15
+                }
+            }
         }
     except Exception as e:
         print(f"クラス分析エラー: {e}")
         return {
             'overall_trend': 'AI分析でエラーが発生しました',
-            'common_misconceptions': ['分析データ不足'],
-            'effective_approaches': ['従来の指導法継続'],
-            'recommendations': ['データ蓄積後に再分析'],
+            'prediction_distribution': {
+                '日常経験型': ['分析データ不足'],
+                '学校経験型': ['分析データ不足'],
+                'メディア経験型': ['分析データ不足'],
+                '想像・推測型': ['分析データ不足']
+            },
+            'experience_based_patterns': ['データ蓄積後に再分析'],
+            'misconception_sources': ['分析データ不足'],
             'engagement_level': 'システムエラー',
             'understanding_distribution': 'システムエラー',
-            'improvement_areas': ['システム調整']
+            'visual_data': {
+                'prediction_types': {
+                    '日常経験型': 0,
+                    '学校経験型': 0,
+                    'メディア経験型': 0,
+                    '想像・推測型': 0
+                },
+                'experience_sources': {
+                    '家庭': 0,
+                    '学校': 0,
+                    'メディア': 0,
+                    'その他': 0
+                }
+            }
         }
 
 @app.route('/teacher/analysis')
@@ -2329,4 +2219,4 @@ def get_available_log_dates():
     return dates
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5011)
+    app.run(debug=True, port=5010)
