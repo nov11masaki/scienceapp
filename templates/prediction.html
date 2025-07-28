@@ -116,10 +116,7 @@ let suggestionIndex = null; // 使用した選択肢のインデックス
 // ページ読み込み時にAPI接続をテスト
 document.addEventListener('DOMContentLoaded', function() {
     testApiConnection();
-    // 最初の選択肢を自動表示
-    setTimeout(() => {
-        loadSuggestions();
-    }, 1000);
+    // 選択肢は初期表示しない（ボタンクリックで表示）
 });
 
 document.getElementById('sendButton').addEventListener('click', sendMessage);

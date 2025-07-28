@@ -595,7 +595,9 @@ def chat():
 2. 日常経験や既習事項と関連付けさせる質問をする
 3. 誘導的な質問は避け、学習者自身の考えを引き出す
 4. 3-4回の対話で予想をまとめられるようにする
-5. **重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
+5. **応答は必ず2-3文以内**で簡潔に返答する
+6. **重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
+7. **重要**：具体例や答えの例示は絶対に行わない。学習者自身に考えさせる
 
 対話回数: {len(conversation)}回目
 
@@ -655,17 +657,26 @@ def summary():
     conversation = session.get('conversation', [])
     unit = session.get('unit')
     
-    # 予想のまとめを生成
+    # 課題文を読み込み
+    task_content = load_task_content(unit)
+    
+    # 予想のまとめを生成（子供が書けるようなシンプルなまとめ）
     summary_prompt = f"""
-以下の対話を基に、学習者の予想を自然な日本語で簡潔にまとめてください。
+以下の対話内容を基に、子供自身が書けるような予想文を作成してください。
+
+課題文: {task_content}
 
 要求：
-1. 「あなたは、〜ということから、〜だと予想したんですね」の形でまとめる
-2. 学習者の根拠と予想を明確に分ける
-3. マークダウン記法（*、**、#、-など）は一切使用しない
-4. 普通の文章のみで書く
-5. 箇条書きや記号は使わない
-6. 平易な言葉を使う
+1. 子供が実際に理科ノートに書くような文体にする
+2. 1-2文の短い予想文にまとめる
+3. 「〜と思います。」「〜だと予想します。」の形で終わる
+4. 対話で出てきた根拠（経験）を簡潔に含める
+5. 難しい言葉は使わず、小学生が書くような表現にする
+6. マークダウン記法（*、**、#、-など）は一切使用しない
+
+例：
+「温めると空気は大きくなると思います。夏にタイヤがパンパンになるのを見たことがあるからです。」
+「空気を冷やすと小さくなると予想します。寒い日にボールがしぼんでいたからです。」
 
 単元: {unit}
 
@@ -733,6 +744,9 @@ def reflect_chat():
 2. 予想と結果の違いを明確にさせる
 3. 日常生活での経験と関連付けさせる
 4. 最終的に「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」の形でまとめられるようにする
+5. **応答は必ず2-3文以内**で簡潔に返答する
+6. マークダウン記法は一切使用禁止
+7. **重要**：具体例や答えの例示は絶対に行わない。学習者自身に考えさせる
 
 対話回数: {len(reflection_conversation)}回目
 """
@@ -1139,17 +1153,26 @@ def get_chat_suggestions():
         elif any(word in latest_ai_response for word in ["いつ", "どこで"]):
             question_type = "状況"
         
-        # レベル別選択肢生成プロンプト
+        # 課題文を読み込み
+        task_content = load_task_content(unit)
+        
+        # 学習者の話し方パターンを分析
+        user_messages = [msg['content'] for msg in conversation if msg['role'] == 'user']
+        user_style = ""
+        if user_messages:
+            # 最近のユーザーメッセージから話し方を分析
+            recent_user_messages = user_messages[-3:] if len(user_messages) > 3 else user_messages
+            user_style = " ".join(recent_user_messages)
+        
+        # レベル別選択肢生成プロンプト（課題文と学習者の話し方を考慮）
         suggestions_prompt = f"""
-あなたは小学校理科の指導者です。児童の言語レベルと対話文脈に応じて、適切な選択肢を3つ生成してください。
+あなたは小学校理科の指導者です。学習者の実際の話し方パターンを分析して、その子が使いそうな自然な選択肢を3つ生成してください。
 
-児童の分析結果:
-- 言語レベル: {language_level}
-- 対話段階: {conversation_stage}
-- 関心話題: {', '.join(topics) if topics else 'なし'}
-- AI質問タイプ: {question_type}
+課題文: {task_content}
 
-単元: {unit}
+学習者の実際の話し方パターン（これらの表現スタイルに合わせてください）:
+{user_style}
+
 直前のAI応答: {latest_ai_response}
 
 最近の対話履歴:
@@ -1161,63 +1184,24 @@ def get_chat_suggestions():
             role = "学習者" if msg['role'] == 'user' else "AI"
             suggestions_prompt += f"{role}: {msg['content']}\n"
         
-        # レベル別の選択肢生成指示
-        if language_level == "基本":
-            suggestions_prompt += f"""
-基本レベル選択肢生成指示:
-1. ひらがな中心で簡単な言葉を使用
-2. 15文字以内の短い選択肢
-3. 身近な体験に関連した内容
-4. 「〜したことがある」「〜を見たことがある」形式を多用
+        suggestions_prompt += f"""
+選択肢生成の要求:
+1. 上記の「学習者の話し方パターン」の文体・語彙・表現レベルに完全に合わせる
+2. その学習者が実際に言いそうな表現を使用する
+3. 課題文「{task_content}」の内容に関連した選択肢
+4. 直前のAI応答「{latest_ai_response}」に対する自然な回答選択肢
+5. 各選択肢は30文字以内で、その子らしい表現で作成
+6. 言語レベルの概念ではなく、実際の話し方パターンを重視
 
-{question_type}タイプの質問への基本レベル選択肢例:
-理由タイプ → "まえにみたから" "おかあさんがいってたから" "なんとなく"
-描写タイプ → "おおきくなる" "あたたかくなる" "やわらかくなる"
-追加タイプ → "ほかはわからない" "もうない" "かんがえてみる"
-"""
-        elif language_level == "中級":
-            suggestions_prompt += f"""
-中級レベル選択肢生成指示:
-1. 適度な漢字を含む自然な文
-2. 20文字程度の選択肢
-3. 学校や友達の経験を含める
-4. 簡単な因果関係を表現
+重要：
+- レベル分けの概念は無視し、実際の学習者の表現に忠実に従う
+- その子が使った単語や表現の仕方を参考にする
+- その子の語尾や助詞の使い方も参考にする
 
-{question_type}タイプの質問への中級レベル選択肢例:
-理由タイプ → "学校で習ったから" "友達と話していて気づいたから" "実際に見て確かめたから"
-描写タイプ → "温度が上がって大きくなる" "熱くなって変化する" "膨らんで見える"
-追加タイプ → "他の場面でも同じことが起きる" "違う条件だと結果が変わる" "詳しく調べてみたい"
-"""
-        else:  # 高級
-            suggestions_prompt += f"""
-高級レベル選択肢生成指示:
-1. 科学用語を適切に使用
-2. 25文字程度の詳しい選択肢
-3. 論理的思考を促す内容
-4. 複数の観点や比較を含める
-
-{question_type}タイプの質問への高級レベル選択肢例:
-理由タイプ → "分子の運動が活発になるから" "以前の実験結果と一致するから" "科学的根拠に基づいて"
-描写タイプ → "温度上昇により分子間距離が拡大" "熱エネルギーによる体積変化" "物質の状態変化が観察される"
-追加タイプ → "他の物質でも同様の現象が起こる" "条件を変えた場合の結果を予測" "実験方法を改良して確認"
-"""
-        
-        # 再生成の場合の追加指示
-        if is_regenerate:
-            suggestions_prompt += """
-再生成特別指示:
-- 前回とは全く異なる視点から選択肢を作成
-- より具体的で個人的な体験を含める
-- 感情や感覚を表現できる選択肢も含める
-"""
-        
-        suggestions_prompt += """
 出力形式:
-選択肢1: [内容]
-選択肢2: [内容]
-選択肢3: [内容]
-
-注意: 児童の言語レベルに完全に合わせた表現で、自然で使いやすい選択肢を作成してください。
+選択肢1: [その学習者が実際に言いそうな表現]
+選択肢2: [その学習者が実際に言いそうな表現]  
+選択肢3: [その学習者が実際に言いそうな表現]
 """
         
         suggestions_response = call_gemini_with_retry(suggestions_prompt)
@@ -1235,38 +1219,17 @@ def get_chat_suggestions():
                 if suggestion and len(suggestion) <= 50:  # 長すぎる選択肢を除外
                     suggestions.append(suggestion)
         
-        # 選択肢が3つ未満の場合は言語レベルに応じたデフォルトを追加
+        # 選択肢が3つ未満の場合は学習者の話し方に合わせたデフォルトを追加
         if len(suggestions) < 3:
-            # 言語レベルに応じたデフォルト選択肢
-            if language_level == "基本":
-                if question_type == "理由":
-                    context_defaults = ["まえにみたから", "おうちでならったから", "なんとなく"]
-                elif question_type == "描写":
-                    context_defaults = ["おおきくなる", "あたたかくなる", "かわる"]
-                elif question_type == "追加":
-                    context_defaults = ["もうない", "わからない", "かんがえてみる"]
-                else:
-                    context_defaults = ["はい", "わからない", "きいてみる"]
-            elif language_level == "中級":
-                if question_type == "理由":
-                    context_defaults = ["前に経験したから", "学校で習ったから", "友達と話したから"]
-                elif question_type == "描写":
-                    context_defaults = ["温度が上がる", "体積が変わる", "様子が変化する"]
-                elif question_type == "追加":
-                    context_defaults = ["他にも考えられる", "よくわからない", "確認したい"]
-                else:
-                    context_defaults = ["そう思う", "よくわからない", "確認したい"]
-            else:  # 高級
-                if question_type == "理由":
-                    context_defaults = ["科学的根拠に基づいて", "実験結果から推測して", "理論的に考えて"]
-                elif question_type == "描写":
-                    context_defaults = ["分子運動の活発化", "熱エネルギーの影響", "物理的性質の変化"]
-                elif question_type == "追加":
-                    context_defaults = ["複数の要因が考えられる", "さらに詳しく分析が必要", "実験で検証したい"]
-                else:
-                    context_defaults = ["さらに詳しく分析", "別の観点から検証", "実験で確認"]
+            # 学習者の話し方パターンを基に、シンプルなデフォルト選択肢を作成
+            if user_style:
+                # 学習者が使いそうな表現を推測
+                simple_defaults = ["そう思う", "よく分からない", "もう少し考えたい"]
+            else:
+                # 話し方パターンが不明な場合は汎用的な選択肢
+                simple_defaults = ["はい", "分からない", "聞いてみたい"]
             
-            for i, default in enumerate(context_defaults):
+            for i, default in enumerate(simple_defaults):
                 if len(suggestions) <= i:
                     suggestions.append(default)
         
@@ -1338,15 +1301,30 @@ def get_reflection_suggestions():
         elif any(word in latest_ai_response for word in ["感じ", "思う"]):
             question_type = "感想"
         
+        # 課題文と予想を読み込み
+        task_content = load_task_content(unit)
+        prediction_summary = session.get('prediction_summary', '')
+        
+        # 学習者の話し方パターンを分析（予想段階も含む）
+        all_user_messages = [msg['content'] for msg in all_conversation if msg['role'] == 'user']
+        user_style = ""
+        if all_user_messages:
+            recent_user_messages = all_user_messages[-3:] if len(all_user_messages) > 3 else all_user_messages
+            user_style = " ".join(recent_user_messages)
+        
         # 再生成の場合は異なるアプローチで選択肢を生成
         if is_regenerate:
             suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、先ほどとは違う視点から学習者（小学生）が答えやすい具体的な選択肢を3つ生成してください。
+あなたは小学校理科の指導者です。考察段階で、先ほどとは違う視点から学習者が答えやすい選択肢を3つ生成してください。
 
+課題文: {task_content}
+学習者の予想: {prediction_summary}
+学習者の話し方例: {user_style}
+
+言語レベル: {language_level}
 単元: {unit}
 
-直前のAI応答:
-{latest_ai_response}
+直前のAI応答: {latest_ai_response}
 
 考察対話履歴:
 """
@@ -1377,12 +1355,16 @@ def get_reflection_suggestions():
         else:
             # 通常の考察用選択肢生成プロンプト
             suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、直前のAI応答に対して学習者（小学生）が次に答えやすい具体的な選択肢を3つ生成してください。
+あなたは小学校理科の指導者です。考察段階で、直前のAI応答に対して学習者が答えやすい選択肢を3つ生成してください。
 
+課題文: {task_content}
+学習者の予想: {prediction_summary}
+学習者の話し方例: {user_style}
+
+言語レベル: {language_level}
 単元: {unit}
 
-直前のAI応答:
-{latest_ai_response}
+直前のAI応答: {latest_ai_response}
 
 考察対話履歴:
 """
@@ -1393,23 +1375,24 @@ def get_reflection_suggestions():
                 role = "学習者" if msg['role'] == 'user' else "AI"
                 suggestions_prompt += f"{role}: {msg['content']}\n"
             
-            suggestions_prompt += """
-要求（考察段階）:
-1. 直前のAI応答の内容に直接関連した選択肢を作成
-2. 実験結果に対する考察や感想を表現できる選択肢
-3. 各選択肢は25文字以内で簡潔に
-4. 予想と結果の比較ができる選択肢
-5. 具体的で学習者が答えやすい内容
-6. 以下の形式で出力してください：
+            suggestions_prompt += f"""
+要求（考察段階 - 学習者の話し方に合わせて）:
+1. 課題文「{task_content}」に対する実験結果の考察に関連した選択肢
+2. 予想「{prediction_summary}」と実験結果の比較ができる選択肢
+3. 学習者の話し方レベル（{language_level}）に合わせた表現を使用
+4. 各選択肢は25文字以内で、学習者が実際に言いそうな表現
+5. 質問タイプ「{question_type}」に適した回答選択肢
 
+選択肢作成のガイドライン:
+- 結果確認型の質問：「〜という結果になった」「〜が観察できた」「〜の変化があった」
+- 予想比較型の質問：「予想通りだった」「予想と違った」「一部だけ合っていた」
+- 理由型の質問：「〜だから」「〜が原因で」「〜のおかげで」
+- 感想型の質問：「驚いた」「面白かった」「もっと知りたい」
+
+出力形式:
 選択肢1: [内容]
 選択肢2: [内容]  
 選択肢3: [内容]
-
-例：
-→ 選択肢1: 予想通りの結果でした
-→ 選択肢2: 予想と少し違いました  
-→ 選択肢3: 予想と全然違いました
 """
         
         suggestions_response = call_gemini_with_retry(suggestions_prompt)
@@ -1423,49 +1406,17 @@ def get_reflection_suggestions():
                 if suggestion and len(suggestion) <= 50:
                     suggestions.append(suggestion)
         
-        # 選択肢が3つ未満の場合は文脈に応じたデフォルトを追加
+        # 選択肢が3つ未満の場合は学習者の話し方に合わせたデフォルトを追加
         if len(suggestions) < 3:
-            if "結果" in latest_ai_response or "どうだった" in latest_ai_response:
-                if is_regenerate:
-                    context_defaults = [
-                        "とても興味深い結果でした",
-                        "思ったより分かりやすい変化でした",
-                        "もう一度確かめてみたいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "予想通りでした",
-                        "予想と違いました",
-                        "よくわかりませんでした"
-                    ]
-            elif "どう思う" in latest_ai_response or "感想" in latest_ai_response:
-                if is_regenerate:
-                    context_defaults = [
-                        "理科って面白いなと思いました",
-                        "もっと詳しく知りたくなりました",
-                        "日常生活でも気をつけて見てみたいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "面白かった",
-                        "勉強になった",
-                        "驚いた"
-                    ]
+            # 学習者の話し方パターンを基に、考察段階に合ったデフォルト選択肢を作成
+            if user_style:
+                # 学習者が使いそうな表現を推測（考察段階用）
+                reflection_defaults = ["予想通りでした", "少し違いました", "よく分からない"]
             else:
-                if is_regenerate:
-                    context_defaults = [
-                        "実際に見てみて理解が深まりました",
-                        "予想を立てるのは難しかったです",
-                        "次はもっと正確に予想したいです"
-                    ]
-                else:
-                    context_defaults = [
-                        "そう思います",
-                        "よくわかりません",
-                        "もう少し考えてみます"
-                    ]
+                # 話し方パターンが不明な場合は汎用的な考察選択肢
+                reflection_defaults = ["そう思う", "違うと思う", "分からない"]
             
-            for i, default in enumerate(context_defaults):
+            for i, default in enumerate(reflection_defaults):
                 if len(suggestions) <= i:
                     suggestions.append(default)
         
@@ -1673,7 +1624,7 @@ def resume_session():
 
 # ログ分析機能
 def analyze_student_learning(student_number, unit, logs):
-    """特定の学生・単元の学習過程をGeminiで分析（指導案考慮）"""
+    """特定の学生・単元の学習過程を言語活動支援の観点でGemini分析（指導案考慮）"""
     print(f"分析開始 - 学生: {student_number}, 単元: {unit}")
     
     # 該当する学生のログを抽出
@@ -1686,12 +1637,16 @@ def analyze_student_learning(student_number, unit, logs):
     if not student_logs:
         return {
             'evaluation': '学習データがありません',
-            'strengths': ['データが不足しています'],
-            'improvements': ['学習活動への参加が必要です'],
-            'score': 0,
-            'thinking_process': 'データなし',
-            'engagement': 'データなし',
-            'scientific_understanding': 'データなし'
+            'language_support_needed': ['学習活動への参加が必要です'],
+            'prediction_analysis': {
+                'experience_connection': 'データなし',
+                'prior_knowledge_use': 'データなし'
+            },
+            'reflection_analysis': {
+                'result_verbalization': 'データなし',
+                'prediction_comparison': 'データなし',
+                'daily_life_connection': 'データなし'
+            }
         }
     
     # 指導案の内容を取得
@@ -1777,59 +1732,40 @@ def analyze_student_learning(student_number, unit, logs):
         analysis_prompt += f"\n最終考察: {final_summary}\n"
     
     analysis_prompt += """
-【評価観点】
-以下の観点で詳細に評価してください：
+【言語活動支援の分析観点】
+生成AIによる言語活動支援の効果を以下の観点で分析してください：
 
-1. 予想の質
-   - 日常生活の経験に基づいているか
-   - 既習事項を活用しているか
-   - 根拠を明確に示しているか
+1. 予想段階での言語化支援
+   - 日常経験や既習事項を言語として引き出せているか
+   - 根拠と予想を関連付けて表現できているか
+   - 児童の固有の経験が予想に活かされているか
 
-2. 考察の質
-   - 実験結果と予想を比較しているか
-   - 結果について日常生活との関連を示しているか
-   - 科学的に妥当な説明ができているか
+2. 考察段階での言語化支援
+   - 実験結果を自分の言葉で表現できているか
+   - 予想との差異について言語化できているか
+   - 日常生活や既習事項との関連を言葉で説明できているか
 
-3. 学習姿勢
-   - 積極的に対話に参加しているか
-   - 自分の言葉で表現しているか
-   - 疑問や興味を示しているか
+3. 言語活動の深化
+   - 対話を通じて思考が深まっているか
+   - 「書くことを通して考える」プロセスが見られるか
+   - AIの問いかけに応じて自分の言葉で説明しようと試みているか
 
 【出力形式】
-以下の形式で評価結果をJSON形式で出力してください：
+以下の形式で分析結果をJSON形式で出力してください：
 
 {
-  "evaluation": "予想では日常経験を活用し、考察では結果と予想を関連付けて論理的に説明しています",
-  "strengths": ["日常経験の活用", "論理的思考", "積極的参加"],
-  "improvements": ["観察の詳細化", "科学用語の使用", "考察の深化"],
-  "score": 7,
-  "thinking_process": "段階的に考えを深めています",
-  "engagement": "意欲的に取り組んでいます",
-  "scientific_understanding": "基本概念を理解しています",
-  "prediction_quality": {
-    "daily_life_connection": "日常経験を根拠として活用している",
-    "prior_knowledge_use": "既習事項を適切に関連付けている",
-    "reasoning_clarity": "根拠を明確に示している"
+  "evaluation": "言語活動支援の観点からの総合評価",
+  "language_support_needed": ["今後の言語化支援のポイント1", "ポイント2", "ポイント3"],
+  "prediction_analysis": {
+    "experience_connection": "経験の言語化状況",
+    "prior_knowledge_use": "既習事項の活用と言語化"
   },
-  "reflection_quality": {
-    "result_prediction_link": "実験結果と予想を比較・検討している",
-    "daily_life_relevance": "結果を日常生活と関連付けている",
-    "scientific_validity": "科学的に妥当な説明をしている"
-  }
-}
-"""
-    
-    analysis_prompt += """
-以下のJSON形式で学習評価を出力してください:
-
-{
-  "evaluation": "総合評価コメント",
-  "strengths": ["長所1", "長所2", "長所3"],
-  "improvements": ["課題1", "課題2", "課題3"],
-  "score": 7,
-  "thinking_process": "思考評価",
-  "engagement": "取組評価", 
-  "scientific_understanding": "理解評価"
+  "reflection_analysis": {
+    "result_verbalization": "結果の言語化状況",
+    "prediction_comparison": "予想との比較の言語化",
+    "daily_life_connection": "日常生活との関連付けの言語化"
+  },
+  "language_development": "言語活動の変化と成長"
 }
 """
     
@@ -1889,67 +1825,52 @@ def analyze_student_learning(student_number, unit, logs):
         # 全て失敗した場合はフォールバック
         print("JSON抽出に失敗、フォールバックを使用")
         return {
-            'evaluation': '学習記録から基本的な取り組み姿勢が確認できます',
-            'strengths': ['学習活動への参加', '対話への積極性', '継続的な取り組み'],
-            'improvements': ['日常経験との関連付け強化', '予想の根拠明確化', '考察の詳細化'],
-            'score': 6,
-            'thinking_process': '段階的に考察を進めています',
-            'engagement': '積極的に学習に取り組んでいます',
-            'scientific_understanding': '基本概念を理解し始めています',
-            'prediction_quality': {
-                'daily_life_connection': '日常経験の活用を促すとよいでしょう',
-                'prior_knowledge_use': '既習事項との関連付けを意識させましょう',
-                'reasoning_clarity': '根拠をより明確に示せるよう指導が必要です'
+            'evaluation': '言語活動の記録から対話への取り組み姿勢が確認できます',
+            'language_support_needed': ['経験の言語化支援', '既習事項との関連付け支援', '結果の表現力向上支援'],
+            'prediction_analysis': {
+                'experience_connection': '日常経験の引き出しを継続的に支援',
+                'prior_knowledge_use': '既習事項との関連付けを意識させる対話が必要'
             },
-            'reflection_quality': {
-                'result_prediction_link': '実験結果と予想の比較を促しましょう',
-                'daily_life_relevance': '日常生活との関連を意識させる指導が効果的です',
-                'scientific_validity': '科学的な説明力を段階的に育成していきましょう'
-            }
+            'reflection_analysis': {
+                'result_verbalization': '実験結果を自分の言葉で表現する練習が必要',
+                'prediction_comparison': '予想との比較を言語化する支援が効果的',
+                'daily_life_connection': '日常生活との関連を言葉で説明する機会を増やす'
+            },
+            'language_development': '対話を通じて徐々に言語化能力が向上しています'
         }
         
     except json.JSONDecodeError as e:
         print(f"JSON解析エラー: {e}")
-        # 教育的観点を含むフォールバック応答
+        # 言語活動支援観点のフォールバック応答
         return {
-            'evaluation': '分析処理でエラーが発生しましたが、学習への取り組みは確認できます',
-            'strengths': ['学習活動への参加', '対話への取り組み', '継続的な学習'],
-            'improvements': ['日常経験との関連付け', '予想根拠の明確化', '考察の論理性向上'],
-            'score': 5,
-            'thinking_process': 'システムエラーのため詳細評価は後日実施',
-            'engagement': '学習意欲は確認できます',
-            'scientific_understanding': '基本的な理解は進んでいます',
-            'prediction_quality': {
-                'daily_life_connection': '日常経験の活用について再評価が必要',
-                'prior_knowledge_use': '既習事項の活用状況を確認中',
-                'reasoning_clarity': '根拠の明確さについて詳細分析予定'
+            'evaluation': '分析処理でエラーが発生しましたが、言語活動への取り組みは確認できます',
+            'language_support_needed': ['システム安定化後の詳細な言語化支援', '個別対話支援の継続', '表現力向上のための指導'],
+            'prediction_analysis': {
+                'experience_connection': '経験の言語化について再評価が必要',
+                'prior_knowledge_use': '既習事項の活用状況を確認中'
             },
-            'reflection_quality': {
-                'result_prediction_link': '結果と予想の関連付けについて評価中',
-                'daily_life_relevance': '日常生活との関連について分析中',
-                'scientific_validity': '科学的説明力について評価予定'
-            }
+            'reflection_analysis': {
+                'result_verbalization': '結果の言語化について評価中',
+                'prediction_comparison': '予想との比較の言語化について分析中',
+                'daily_life_connection': '日常生活との関連付けについて評価予定'
+            },
+            'language_development': 'システム復旧後に言語活動の成長を詳細分析予定'
         }
     except Exception as e:
         print(f"分析エラー: {e}")
         return {
-            'evaluation': f'システムエラーが発生しましたが、学習記録は保存されています',
-            'strengths': ['学習データの蓄積', '継続的な取り組み', '記録の完成'],
-            'improvements': ['システム安定化後の詳細分析', '教育的評価の実施', '個別指導計画の作成'],
-            'score': 4,
-            'thinking_process': f'エラー詳細: {str(e)[:50]}...',
-            'engagement': '学習への参加は記録されています',
-            'scientific_understanding': 'システム復旧後に詳細評価予定',
-            'prediction_quality': {
-                'daily_life_connection': 'システム復旧後に評価実施',
-                'prior_knowledge_use': 'データ解析後に詳細確認',
-                'reasoning_clarity': '後日詳細分析予定'
+            'evaluation': f'システムエラーが発生しましたが、言語活動の記録は保存されています',
+            'language_support_needed': ['システム調整後の分析再実施', '継続的な言語化支援', '個別対話指導の継続'],
+            'prediction_analysis': {
+                'experience_connection': f'エラー詳細: {str(e)[:30]}...',
+                'prior_knowledge_use': 'データ解析後に詳細確認'
             },
-            'reflection_quality': {
-                'result_prediction_link': '詳細分析は後日実施',
-                'daily_life_relevance': 'システム安定後に評価',
-                'scientific_validity': '包括的評価を後日実施'
-            }
+            'reflection_analysis': {
+                'result_verbalization': 'システム復旧後に評価実施',
+                'prediction_comparison': '後日詳細分析予定',
+                'daily_life_connection': '包括的評価を後日実施'
+            },
+            'language_development': 'システム安定後に言語活動の変化を分析'
         }
     
     try:
@@ -2075,16 +1996,14 @@ def analyze_class_trends(logs, unit=None):
         analysis_prompt += f"{i}. {ref[:50]}...\n"
     
     analysis_prompt += """
-以下の項目でクラス分析をJSONで出力してください。
+言語活動支援の観点からクラス全体の状況を分析してください。
 
-項目:
-- overall_trend: クラス全体の傾向（100文字程度）
-- common_misconceptions: よくある誤解を3つ
-- effective_approaches: 効果的な指導法を3つ
-- recommendations: 指導提案を3つ
-- engagement_level: 取り組み度（高/中/低）
-- understanding_distribution: 理解度分布
-- improvement_areas: 重点指導分野を2つ
+【分析項目】
+- overall_trend: クラス全体の言語活動の傾向（100文字程度）
+- language_challenges: 児童が共通して抱える言語化の課題を3つ
+- verbalization_level: 言語化能力のレベル（発展中/安定/要支援）
+- dialogue_engagement: 対話への参加状況
+- expression_growth: 表現力の成長状況を2つ
 
 JSON形式で回答してください。
 """
@@ -2093,13 +2012,11 @@ JSON形式で回答してください。
 この学習状況について、以下の形式で分析結果をJSON形式で出力してください。
 
 {
-  "overall_trend": "クラス全体で積極的に学習に取り組んでいます",
-  "common_misconceptions": ["基本概念の混同", "観察結果の解釈", "予想と結果の関連"],
-  "effective_approaches": ["体験的学習", "対話型指導", "段階的説明"],
-  "recommendations": ["個別指導強化", "実験機会増加", "振り返り時間確保"],
-  "engagement_level": "高",
-  "understanding_distribution": "理解度にばらつきがあります",
-  "improvement_areas": ["観察技能", "論理的思考"]
+  "overall_trend": "クラス全体で言語活動に意欲的に取り組んでいます",
+  "language_challenges": ["経験の言語化", "既習事項との関連付け", "結果の表現"],
+  "verbalization_level": "発展中",
+  "dialogue_engagement": "積極的に対話に参加しています",
+  "expression_growth": ["自分の言葉での表現", "論理的な説明の向上"]
 }
 """
     
@@ -2159,24 +2076,20 @@ JSON形式で回答してください。
         # 全て失敗した場合はフォールバック
         print("クラス分析JSON抽出に失敗、フォールバックを使用")
         return {
-            'overall_trend': 'クラス全体として理科学習に意欲的に取り組んでいます',
-            'common_misconceptions': ['実験結果の解釈', '科学的概念の理解', '観察と推論の区別'],
-            'effective_approaches': ['実体験による学習', '対話的な授業', '段階的な説明'],
-            'recommendations': ['個別サポートの充実', '実験時間の確保', '振り返り活動の強化'],
-            'engagement_level': '高',
-            'understanding_distribution': '理解度に個人差が見られます',
-            'improvement_areas': ['観察技能の向上', '科学的思考力の育成']
+            'overall_trend': 'クラス全体として言語活動に意欲的に取り組んでいます',
+            'language_challenges': ['経験の言語化', '既習事項との関連付け', '結果の表現力'],
+            'verbalization_level': '発展中',
+            'dialogue_engagement': '積極的に対話に参加している状況です',
+            'expression_growth': ['自分の言葉での表現向上', '思考の言語化進展']
         }
     except Exception as e:
         print(f"クラス分析エラー: {e}")
         return {
-            'overall_trend': 'AI分析でエラーが発生しました',
-            'common_misconceptions': ['分析データ不足'],
-            'effective_approaches': ['従来の指導法継続'],
-            'recommendations': ['データ蓄積後に再分析'],
-            'engagement_level': 'システムエラー',
-            'understanding_distribution': 'システムエラー',
-            'improvement_areas': ['システム調整']
+            'overall_trend': '言語活動の分析でエラーが発生しました',
+            'language_challenges': ['分析データ不足'],
+            'verbalization_level': 'システムエラー',
+            'dialogue_engagement': 'システムエラー',
+            'expression_growth': ['システム調整']
         }
 
 @app.route('/teacher/analysis')
