@@ -158,32 +158,51 @@ def extract_message_from_json_response(response):
             import json
             parsed = json.loads(response)
             
-            # responseフィールドがある場合
-            if 'response' in parsed:
-                return parsed['response']
-            # summaryフィールドがある場合
-            elif 'summary' in parsed:
-                return parsed['summary']
-            # messageフィールドがある場合
-            elif 'message' in parsed:
-                return parsed['message']
-            else:
-                # JSONだが適切なフィールドがない場合はそのまま返す
-                return response
+            # よくあるフィールド名から順番に確認
+            common_fields = ['response', 'message', 'question', 'summary', 'text', 'content', 'answer']
+            
+            for field in common_fields:
+                if field in parsed and isinstance(parsed[field], str):
+                    return parsed[field]
+            
+            # その他のフィールドから文字列値を探す
+            for key, value in parsed.items():
+                if isinstance(value, str) and len(value.strip()) > 0:
+                    return value
+                    
+            # JSONだが適切なフィールドがない場合はそのまま返す
+            return response
                 
         # リスト形式の場合の処理
         elif response.strip().startswith('[') and response.strip().endswith(']'):
             import json
             parsed = json.loads(response)
             if isinstance(parsed, list) and len(parsed) > 0:
-                item = parsed[0]
-                if isinstance(item, dict):
-                    if 'response' in item:
-                        return item['response']
-                    elif 'summary' in item:
-                        return item['summary']
-                    elif 'message' in item:
-                        return item['message']
+                # リストの各要素を処理
+                results = []
+                for item in parsed:
+                    if isinstance(item, dict):
+                        # よくあるフィールド名から順番に確認
+                        common_fields = ['予想', 'response', 'message', 'question', 'summary', 'text', 'content']
+                        found = False
+                        for field in common_fields:
+                            if field in item and isinstance(item[field], str):
+                                results.append(item[field])
+                                found = True
+                                break
+                        
+                        # よくあるフィールドが見つからない場合は最初の文字列値を使用
+                        if not found:
+                            for key, value in item.items():
+                                if isinstance(value, str) and len(value.strip()) > 0:
+                                    results.append(value)
+                                    break
+                    elif isinstance(item, str):
+                        results.append(item)
+                
+                # 複数の予想を改行で結合
+                if results:
+                    return '\n'.join(results)
             return response
             
         # JSON形式でない場合はそのまま返す
@@ -270,112 +289,21 @@ def get_lesson_plans_list():
     except (json.JSONDecodeError, Exception):
         return {}
 
-def analyze_student_language_level(conversation):
-    """児童の言語レベルを分析する"""
-    if not conversation:
-        return "基本"
-    
-    user_messages = [msg['content'] for msg in conversation if msg['role'] == 'user']
-    
-    if not user_messages:
-        return "基本"
-    
-    # 言語レベルの判定基準
-    total_chars = sum(len(msg) for msg in user_messages)
-    avg_length = total_chars / len(user_messages) if user_messages else 0
-    
-    # 複雑な表現のチェック
-    complex_patterns = ['なぜなら', 'だから', 'しかし', 'でも', 'つまり', 'ということは']
-    complex_count = sum(1 for msg in user_messages for pattern in complex_patterns if pattern in msg)
-    
-    # 科学用語のチェック
-    science_terms = ['温度', '体積', '分子', '原子', '熱', '実験', '観察', '予想', '結果']
-    science_count = sum(1 for msg in user_messages for term in science_terms if term in msg)
-    
-    # レベル判定
-    if avg_length > 20 and complex_count > 0 and science_count > 1:
-        return "高級"
-    elif avg_length > 10 and (complex_count > 0 or science_count > 0):
-        return "中級"
-    else:
-        return "基本"
-
-def get_language_style_instruction(level):
-    """言語レベルに応じた会話スタイルの指示を返す"""
-    styles = {
-        "基本": """
-言語スタイル指示（基本レベル）:
-- ひらがなを多く使い、漢字は最小限にする
-- 短い文で話す（15文字以内を心がける）
-- 「ね」「よ」「かな」などの親しみやすい語尾を使う
-- 身近な例え話を使う（家族、ペット、遊びなど）
-- 一度に一つの質問だけする
-例: "あたたかくなると、どうなるかな？"
-""",
-        "中級": """
-言語スタイル指示（中級レベル）:
-- 適度に漢字を使い、読みやすい文にする
-- 中程度の文の長さ（20文字程度）
-- 理由を聞く質問を含める
-- 学校生活に関連した例を使う
-- 因果関係を意識した質問をする
-例: "温度が上がると体積が変わると思った理由は何かな？"
-""",
-        "高級": """
-言語スタイル指示（高級レベル）:
-- 科学用語を適切に使用する
-- やや長めの文で詳しく説明する
-- 論理的思考を促す質問をする
-- 複数の観点から考えさせる
-- 既習事項との関連付けを促す
-例: "これまでの実験結果と比較して、どのような共通点や違いが見つかりますか？"
-"""
-    }
-    return styles.get(level, styles["基本"])
-
-def generate_contextual_suggestions(conversation, unit, latest_ai_response, is_regenerate=False):
-    """文脈に応じた選択肢を生成する"""
-    
-    # 児童の言語レベルを分析
-    language_level = analyze_student_language_level(conversation)
-    
-    # 対話の段階を分析
-    conversation_stage = "初期"
-    if len(conversation) >= 6:
-        conversation_stage = "深化"
-    elif len(conversation) >= 3:
-        conversation_stage = "展開"
-    
-    # 最近の話題を分析
-    user_messages = [msg['content'] for msg in conversation if msg['role'] == 'user'][-3:]
-    topics = []
-    
-    # 経験関連の話題
-    experience_keywords = ['見た', '聞いた', '触った', '感じた', '体験', '経験']
-    if any(keyword in ' '.join(user_messages) for keyword in experience_keywords):
-        topics.append("経験")
-    
-    # 家族・友達関連の話題
-    social_keywords = ['お母さん', 'お父さん', '家族', '友達', '先生', '兄弟']
-    if any(keyword in ' '.join(user_messages) for keyword in social_keywords):
-        topics.append("社会的")
-    
-    # 感情・感覚関連の話題
-    emotion_keywords = ['楽しい', '面白い', '不思議', 'びっくり', '驚く']
-    if any(keyword in ' '.join(user_messages) for keyword in emotion_keywords):
-        topics.append("感情")
-    
-    return {
-        'language_level': language_level,
-        'conversation_stage': conversation_stage,
-        'topics': topics
-    }
-
 # APIコール用のリトライ関数
 def call_gemini_with_retry(prompt, max_retries=3, delay=2):
     """Gemini APIを呼び出し、エラー時はリトライする"""
     if model is None:
         return "AI システムの初期化に問題があります。管理者に連絡してください。"
+    
+    # プロンプトにJSON応答防止の指示を追加
+    enhanced_prompt = f"""{prompt}
+
+**重要な指示:**
+- JSON形式では絶対に回答しないでください
+- 普通の日本語の文章で回答してください
+- {{ }} や [ ] を使った形式は禁止です
+- 自然な会話形式で回答してください
+"""
     
     for attempt in range(max_retries):
         try:
@@ -387,7 +315,7 @@ def call_gemini_with_retry(prompt, max_retries=3, delay=2):
             
             # REST APIでリクエストを送信
             response = model.generate_content(
-                prompt,
+                enhanced_prompt,
                 request_options={'timeout': 30}  # 30秒タイムアウト
             )
             
@@ -558,8 +486,6 @@ def prediction():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get('message')
-    used_suggestion = request.json.get('used_suggestion', False)  # 選択肢使用フラグ
-    suggestion_index = request.json.get('suggestion_index', None)  # 選択肢のインデックス
     conversation = session.get('conversation', [])
     unit = session.get('unit')
     task_content = session.get('task_content')
@@ -567,46 +493,42 @@ def chat():
     # 対話履歴に追加
     conversation.append({'role': 'user', 'content': user_message})
     
-    # 児童の言語レベルと対話コンテキストを分析
-    context_analysis = generate_contextual_suggestions(conversation, unit, "", False)
-    language_level = context_analysis['language_level']
-    conversation_stage = context_analysis['conversation_stage']
-    topics = context_analysis['topics']
-    
-    # 言語スタイルの指示を取得
-    language_style = get_language_style_instruction(language_level)
-    
-    # Gemini APIへのプロンプト作成（言語レベル適応型）
+    # Gemini APIへのプロンプト作成（小学生向け産婆法）
     system_prompt = f"""
-あなたは小学生の理科学習を支援するAIです。産婆法のような対話を通して、学習者の経験や既習事項を引き出し、根拠のある予想を立てさせることが目的です。
+あなたは小学生向けの産婆法（ソクラテス式問答法）を実践する理科指導者です。小学生のレベルに合わせた簡単な質問で、学習者自身に気づかせることが目的です。
 
 現在の学習単元: {unit}
 課題: {task_content}
 
-児童の特徴分析:
-- 言語レベル: {language_level}
-- 対話段階: {conversation_stage}
-- 関心のある話題: {', '.join(topics) if topics else '探索中'}
+小学生向け産婆法の指針:
+1. **簡単な質問から始める** - 「どうだった？」「何が見えた？」
+2. **1つずつ聞く** - 複数の質問を同時にしない
+3. **身近な例で考えさせる** - 風船、ボール、タイヤなど日常のもの
+4. **「なぜ？」は優しく** - 「どうしてそう思う？」「何を見てそう思った？」
+5. **学習者の発言を受け止める** - まず肯定してから次の質問
+6. **経験を聞く** - 「前に見たことある？」「どんな時に？」
 
-{language_style}
+対話の進め方:
+- 1-2回目: 実験結果を具体的に聞く「何が起こった？」
+- 3-4回目: 経験と結びつける「いつ、そんなことを見た？」
+- 5回目以降: 理由を考えさせる「どうしてそうなったと思う？」
 
-対話ガイドライン:
-1. 学習者の答えを否定せず、「なぜそう思うのか」を聞いて根拠を探る
-2. 日常経験や既習事項と関連付けさせる質問をする
-3. 誘導的な質問は避け、学習者自身の考えを引き出す
-4. 3-4回の対話で予想をまとめられるようにする
-5. **応答は必ず2-3文以内**で簡潔に返答する
-6. **重要**：マークダウン記法（*、**、#、-など）は一切使用禁止。普通の文章のみで回答してください。
-7. **重要**：具体例や答えの例示は絶対に行わない。学習者自身に考えさせる
+**絶対に守ること:**
+- 1文で短く質問する（20文字以内を目指す）
+- 小学生が知らない専門用語は使わない
+- 複雑な例え話はしない
+- 1回に1つのことだけ聞く
+- JSON形式では絶対に回答しない
+- 普通の文章で質問する
+
+**回答例:**
+「どんなことが起こりましたか？」
+「前に似たことを見たことはありますか？」
+「どうしてそう思いますか？」
 
 対話回数: {len(conversation)}回目
 
-特別な配慮:
-- {conversation_stage}段階なので、{"基本的な質問から始める" if conversation_stage == "初期" else "より深い理解を促す" if conversation_stage == "展開" else "総合的な思考を促す"}
-- {"経験談を大切にする" if "経験" in topics else ""}
-- {"社会的な関係性を活用する" if "社会的" in topics else ""}
-- {"感情面にも配慮する" if "感情" in topics else ""}
-"""
+次の質問を普通の文章で1文で書いてください："""
     
     # 対話履歴を含めてプロンプト作成
     full_prompt = system_prompt + "\n\n対話履歴:\n"
@@ -626,7 +548,7 @@ def chat():
         conversation.append({'role': 'assistant', 'content': ai_message})
         session['conversation'] = conversation
         
-        # 学習ログを保存（選択肢使用情報を含む）
+        # 学習ログを保存
         save_learning_log(
             student_number=session.get('student_number'),
             unit=unit,
@@ -634,9 +556,7 @@ def chat():
             data={
                 'user_message': user_message,
                 'ai_response': ai_message,
-                'conversation_count': len(conversation) // 2,
-                'used_suggestion': used_suggestion,
-                'suggestion_index': suggestion_index
+                'conversation_count': len(conversation) // 2
             }
         )
         
@@ -660,24 +580,20 @@ def summary():
     # 課題文を読み込み
     task_content = load_task_content(unit)
     
-    # 予想のまとめを生成（子供が書けるようなシンプルなまとめ）
+    # 予想のまとめを生成（対話内容のみに基づく）
     summary_prompt = f"""
-以下の対話内容を基に、子供自身が書けるような予想文を作成してください。
+以下の対話内容「のみ」を基に、学習者が実際に発言した内容をまとめて予想文を作成してください。
+
+**重要な制約:**
+1. 対話に出てこなかった内容は絶対に追加しない
+2. 学習者が実際に言った言葉や表現をできるだけ使用する
+3. 学習者が話した経験や根拠のみを含める
+4. 対話で言及されていない例や理由は一切使わない
+5. 1-2文の短い予想文にまとめる
+6. 「〜と思います。」「〜だと予想します。」の形で終わる
+7. マークダウン記法は一切使用しない
 
 課題文: {task_content}
-
-要求：
-1. 子供が実際に理科ノートに書くような文体にする
-2. 1-2文の短い予想文にまとめる
-3. 「〜と思います。」「〜だと予想します。」の形で終わる
-4. 対話で出てきた根拠（経験）を簡潔に含める
-5. 難しい言葉は使わず、小学生が書くような表現にする
-6. マークダウン記法（*、**、#、-など）は一切使用しない
-
-例：
-「温めると空気は大きくなると思います。夏にタイヤがパンパンになるのを見たことがあるからです。」
-「空気を冷やすと小さくなると予想します。寒い日にボールがしぼんでいたからです。」
-
 単元: {unit}
 
 対話履歴:
@@ -723,8 +639,6 @@ def reflection():
 @app.route('/reflect_chat', methods=['POST'])
 def reflect_chat():
     user_message = request.json.get('message')
-    used_suggestion = request.json.get('used_suggestion', False)  # 選択肢使用フラグ
-    suggestion_index = request.json.get('suggestion_index', None)  # 選択肢のインデックス
     reflection_conversation = session.get('reflection_conversation', [])
     unit = session.get('unit')
     prediction_summary = session.get('prediction_summary', '')
@@ -732,24 +646,70 @@ def reflect_chat():
     # 反省対話履歴に追加
     reflection_conversation.append({'role': 'user', 'content': user_message})
     
-    # 考察支援プロンプト
+    # 考察支援プロンプト（小学生向け産婆法）
+    conversation_turn = len(reflection_conversation) // 2 + 1
+    
     system_prompt = f"""
-あなたは小学生の理科学習における考察を支援するAIです。実験結果と予想を比較し、日常生活と関連付けた考察を作らせることが目的です。
+あなたは小学生の考察を支援する先生です。実験結果について子どもが段階的に考えられるよう導いてください。
 
 学習単元: {unit}
 予想: {prediction_summary}
 
-以下のガイドラインに従って対話してください：
-1. 実験結果を具体的に言語化させる
-2. 予想と結果の違いを明確にさせる
-3. 日常生活での経験と関連付けさせる
-4. 最終的に「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」の形でまとめられるようにする
-5. **応答は必ず2-3文以内**で簡潔に返答する
-6. マークダウン記法は一切使用禁止
-7. **重要**：具体例や答えの例示は絶対に行わない。学習者自身に考えさせる
+**現在の段階判定:**
+- 1-2回目: 実験結果の確認段階
+- 3-4回目: 予想との比較段階  
+- 5-6回目: 理由の考察段階
+- 7回目以降: 日常生活との関連段階
 
-対話回数: {len(reflection_conversation)}回目
+**今回({conversation_turn}回目)の指導方針:**
 """
+
+    if conversation_turn <= 2:
+        system_prompt += """
+第1段階: 実験結果の言語化
+- 「実験でどんなことが起こりましたか？」
+- 「もう少し詳しく教えてください」
+- 子どもが結果を自分の言葉で具体的に説明できるまで聞く
+"""
+    elif conversation_turn <= 4:
+        system_prompt += """
+第2段階: 予想との比較
+- 「あなたの予想と同じでしたか？」
+- 「予想と違った部分はありますか？」
+- 「どんな気持ちですか？」
+- 予想が当たっても外れても、まずその気持ちを大切にする
+"""
+    elif conversation_turn <= 6:
+        system_prompt += """
+第3段階: 理由の考察
+- 「どうしてそうなったと思いますか？」
+- 「何が原因だと思いますか？」
+- 子どもなりの理由や考えを大切にし、考えを深める
+"""
+    else:
+        system_prompt += """
+第4段階: 日常生活との関連
+- 「普段の生活で似たことはありますか？」
+- 「いつ、どこで見たことがありますか？」
+- 身近な経験と結びつけて理解を深める
+"""
+
+    system_prompt += f"""
+
+**応答のルール:**
+1. 子どもの発言をまず受け止める（「そうですね」「なるほど」等）
+2. その後、1つだけ短い質問をする（15文字以内）
+3. JSON形式は絶対に使わない
+4. 普通の日本語で話す
+5. 専門用語は使わない
+
+**良い応答例:**
+「そうですね。予想と同じでしたか？」
+「なるほど。どうしてそう思いますか？」
+「いいですね。どんな気持ちですか？」
+
+今は{conversation_turn}回目の対話です。
+子どもの発言を受け止めてから、適切な質問を1つしてください："""
     
     # 対話履歴を含めてプロンプト作成
     full_prompt = system_prompt + "\n\n対話履歴:\n"
@@ -769,7 +729,7 @@ def reflect_chat():
         reflection_conversation.append({'role': 'assistant', 'content': ai_message})
         session['reflection_conversation'] = reflection_conversation
         
-        # 考察チャットのログを保存（選択肢使用情報を含む）
+        # 考察チャットのログを保存
         save_learning_log(
             student_number=session.get('student_number'),
             unit=unit,
@@ -777,9 +737,7 @@ def reflect_chat():
             data={
                 'user_message': user_message,
                 'ai_response': ai_message,
-                'conversation_count': len(reflection_conversation) // 2,
-                'used_suggestion': used_suggestion,
-                'suggestion_index': suggestion_index
+                'conversation_count': len(reflection_conversation) // 2
             }
         )
         
@@ -794,19 +752,22 @@ def final_summary():
     reflection_conversation = session.get('reflection_conversation', [])
     prediction_summary = session.get('prediction_summary', '')
     
-    # 最終まとめを生成
+    # 最終まとめを生成（対話内容のみに基づく）
     final_prompt = f"""
-以下の対話を基に、定型文に従って考察を自然な日本語でまとめてください。
+以下の対話内容「のみ」を基に、学習者が実際に発言した内容をまとめて考察文を作成してください。
 
-要求：
-1. 定型文の形式を守る：「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」
-2. マークダウン記法（*、**、#、-など）は一切使用しない
-3. 普通の文章のみで書く
-4. 箇条書きや記号は使わない
+**重要な制約:**
+1. 対話に出てこなかった内容は絶対に追加しない
+2. 学習者が実際に言った実験結果のみを使用する
+3. 学習者が実際に話した経験や考えのみを含める
+4. 対話で言及されていない結論や解釈は一切追加しない
+5. 定型文の形式を守る：「(結果)という結果であった。(予想)と予想していたが、(合っていた/誤っていた)。このことから(経験や既習事項)は~と考えた」
+6. マークダウン記法は一切使用しない
+7. 学習者の実際の表現をできるだけ使用する
 
-予想: {prediction_summary}
+学習者の予想: {prediction_summary}
 
-対話履歴:
+考察対話履歴:
 """
     for msg in reflection_conversation:
         role = "学習者" if msg['role'] == 'user' else "AI"
@@ -1109,430 +1070,6 @@ def teacher_export():
             })
     
     return jsonify({'message': f'エクスポートが完了しました: {output_file}'})
-
-@app.route('/chat/suggestions', methods=['POST'])
-def get_chat_suggestions():
-    """対話の文脈に応じた選択肢を生成する"""
-    try:
-        # リクエストデータの確認
-        data = request.get_json() or {}
-        conversation = session.get('conversation', [])
-        unit = session.get('unit', '理科')
-        is_regenerate = data.get('regenerate', False)  # 再生成フラグ
-        
-        # 最新のAI応答を取得
-        latest_ai_response = ""
-        if conversation and len(conversation) > 0:
-            latest_ai_response = conversation[-1].get('content', '') if conversation[-1].get('role') == 'assistant' else ""
-        
-        # 対話が少ない場合は基本的な選択肢を返す
-        if len(conversation) < 2:
-            default_suggestions = [
-                "どのような結果になると思いますか？",
-                "理由も教えてください",
-                "他にも考えられることはありますか？"
-            ]
-            return jsonify({
-                'suggestions': default_suggestions
-            })
-        
-        # 文脈とレベル分析
-        context_analysis = generate_contextual_suggestions(conversation, unit, latest_ai_response, is_regenerate)
-        language_level = context_analysis['language_level']
-        conversation_stage = context_analysis['conversation_stage']
-        topics = context_analysis['topics']
-        
-        # AIの質問タイプを分析
-        question_type = "一般"
-        if any(word in latest_ai_response for word in ["どうして", "なぜ", "理由"]):
-            question_type = "理由"
-        elif any(word in latest_ai_response for word in ["どんな", "どのような"]):
-            question_type = "描写"
-        elif any(word in latest_ai_response for word in ["他に", "ほか", "別"]):
-            question_type = "追加"
-        elif any(word in latest_ai_response for word in ["いつ", "どこで"]):
-            question_type = "状況"
-        
-        # 課題文を読み込み
-        task_content = load_task_content(unit)
-        
-        # 学習者の話し方パターンを分析
-        user_messages = [msg['content'] for msg in conversation if msg['role'] == 'user']
-        user_style = ""
-        if user_messages:
-            # 最近のユーザーメッセージから話し方を分析
-            recent_user_messages = user_messages[-3:] if len(user_messages) > 3 else user_messages
-            user_style = " ".join(recent_user_messages)
-        
-        # レベル別選択肢生成プロンプト（課題文と学習者の話し方を考慮）
-        suggestions_prompt = f"""
-あなたは小学校理科の指導者です。学習者の実際の話し方パターンを分析して、その子が使いそうな自然な選択肢を3つ生成してください。
-
-課題文: {task_content}
-
-学習者の実際の話し方パターン（これらの表現スタイルに合わせてください）:
-{user_style}
-
-直前のAI応答: {latest_ai_response}
-
-最近の対話履歴:
-"""
-        
-        # 最新の対話を含める
-        recent_conversation = conversation[-6:] if len(conversation) > 6 else conversation
-        for msg in recent_conversation:
-            role = "学習者" if msg['role'] == 'user' else "AI"
-            suggestions_prompt += f"{role}: {msg['content']}\n"
-        
-        suggestions_prompt += f"""
-選択肢生成の要求:
-1. 上記の「学習者の話し方パターン」の文体・語彙・表現レベルに完全に合わせる
-2. その学習者が実際に言いそうな表現を使用する
-3. 課題文「{task_content}」の内容に関連した選択肢
-4. 直前のAI応答「{latest_ai_response}」に対する自然な回答選択肢
-5. 各選択肢は30文字以内で、その子らしい表現で作成
-6. 言語レベルの概念ではなく、実際の話し方パターンを重視
-
-重要：
-- レベル分けの概念は無視し、実際の学習者の表現に忠実に従う
-- その子が使った単語や表現の仕方を参考にする
-- その子の語尾や助詞の使い方も参考にする
-
-出力形式:
-選択肢1: [その学習者が実際に言いそうな表現]
-選択肢2: [その学習者が実際に言いそうな表現]  
-選択肢3: [その学習者が実際に言いそうな表現]
-"""
-        
-        suggestions_response = call_gemini_with_retry(suggestions_prompt)
-        
-        # JSON形式のレスポンスの場合は解析
-        suggestions_text = extract_message_from_json_response(suggestions_response)
-        
-        # レスポンスから選択肢を抽出
-        suggestions = []
-        lines = suggestions_text.split('\n')
-        for line in lines:
-            if line.startswith('選択肢'):
-                # "選択肢1: " の部分を除去
-                suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-                if suggestion and len(suggestion) <= 50:  # 長すぎる選択肢を除外
-                    suggestions.append(suggestion)
-        
-        # 選択肢が3つ未満の場合は学習者の話し方に合わせたデフォルトを追加
-        if len(suggestions) < 3:
-            # 学習者の話し方パターンを基に、シンプルなデフォルト選択肢を作成
-            if user_style:
-                # 学習者が使いそうな表現を推測
-                simple_defaults = ["そう思う", "よく分からない", "もう少し考えたい"]
-            else:
-                # 話し方パターンが不明な場合は汎用的な選択肢
-                simple_defaults = ["はい", "分からない", "聞いてみたい"]
-            
-            for i, default in enumerate(simple_defaults):
-                if len(suggestions) <= i:
-                    suggestions.append(default)
-        
-        return jsonify({
-            'suggestions': suggestions[:3],  # 最大3つまで
-            'regenerated': is_regenerate,
-            'language_level': language_level,
-            'context': {
-                'stage': conversation_stage,
-                'topics': topics,
-                'question_type': question_type
-            }
-        })
-        
-    except Exception as e:
-        print(f"選択肢生成エラー: {str(e)}")
-        # エラー時はデフォルトの選択肢を返す
-        default_suggestions = [
-            "そう思う",
-            "よくわからない",
-            "もう少し教えて"
-        ]
-        return jsonify({
-            'suggestions': default_suggestions
-        })
-
-@app.route('/reflection/suggestions', methods=['POST'])
-def get_reflection_suggestions():
-    """考察対話の文脈に応じた選択肢を生成する"""
-    try:
-        # リクエストデータの確認
-        data = request.get_json() or {}
-        reflection_conversation = session.get('reflection_conversation', [])
-        unit = session.get('unit', '理科')
-        is_regenerate = data.get('regenerate', False)  # 再生成フラグ
-        
-        # 最新のAI応答を取得
-        latest_ai_response = ""
-        if reflection_conversation and len(reflection_conversation) > 0:
-            latest_ai_response = reflection_conversation[-1].get('content', '') if reflection_conversation[-1].get('role') == 'assistant' else ""
-        
-        # 対話が少ない場合は基本的な選択肢を返す
-        if len(reflection_conversation) < 2:
-            default_suggestions = [
-                "予想通りの結果でした",
-                "予想と違う結果でした",
-                "よくわからない結果でした"
-            ]
-            return jsonify({
-                'suggestions': default_suggestions
-            })
-        
-        # 全体の対話履歴から言語レベルを分析（予想段階+考察段階）
-        conversation = session.get('conversation', [])
-        all_conversation = conversation + reflection_conversation
-        context_analysis = generate_contextual_suggestions(all_conversation, unit, latest_ai_response, is_regenerate)
-        language_level = context_analysis['language_level']
-        conversation_stage = "考察段階"
-        topics = context_analysis['topics']
-        
-        # AIの質問タイプを分析（考察段階用）
-        question_type = "一般"
-        if any(word in latest_ai_response for word in ["結果", "実験"]):
-            question_type = "結果確認"
-        elif any(word in latest_ai_response for word in ["予想", "思っていた"]):
-            question_type = "予想比較"
-        elif any(word in latest_ai_response for word in ["どうして", "なぜ", "理由"]):
-            question_type = "理由"
-        elif any(word in latest_ai_response for word in ["感じ", "思う"]):
-            question_type = "感想"
-        
-        # 課題文と予想を読み込み
-        task_content = load_task_content(unit)
-        prediction_summary = session.get('prediction_summary', '')
-        
-        # 学習者の話し方パターンを分析（予想段階も含む）
-        all_user_messages = [msg['content'] for msg in all_conversation if msg['role'] == 'user']
-        user_style = ""
-        if all_user_messages:
-            recent_user_messages = all_user_messages[-3:] if len(all_user_messages) > 3 else all_user_messages
-            user_style = " ".join(recent_user_messages)
-        
-        # 再生成の場合は異なるアプローチで選択肢を生成
-        if is_regenerate:
-            suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、先ほどとは違う視点から学習者が答えやすい選択肢を3つ生成してください。
-
-課題文: {task_content}
-学習者の予想: {prediction_summary}
-学習者の話し方例: {user_style}
-
-言語レベル: {language_level}
-単元: {unit}
-
-直前のAI応答: {latest_ai_response}
-
-考察対話履歴:
-"""
-            # 最新の4往復分の対話を含める（前回より多く）
-            recent_conversation = reflection_conversation[-8:] if len(reflection_conversation) > 8 else reflection_conversation
-            for msg in recent_conversation:
-                role = "学習者" if msg['role'] == 'user' else "AI"
-                suggestions_prompt += f"{role}: {msg['content']}\n"
-            
-            suggestions_prompt += """
-再生成要求（考察段階）:
-1. 前回とは異なる角度から考察用選択肢を作成
-2. 実験結果と予想の比較に関する具体的な選択肢
-3. 感想や驚きを表現できる選択肢も含める
-4. 日常生活との関連を考えられる選択肢
-5. 各選択肢は30文字以内で分かりやすく
-6. 以下の形式で出力してください：
-
-選択肢1: [内容]
-選択肢2: [内容]  
-選択肢3: [内容]
-
-例（再生成版）：
-→ 選択肢1: 思っていたよりもはっきりした変化でした
-→ 選択肢2: 予想していた通りで嬉しかったです  
-→ 選択肢3: 普段の生活でも似たことがありそうです
-"""
-        else:
-            # 通常の考察用選択肢生成プロンプト
-            suggestions_prompt = f"""
-あなたは小学校理科の指導者です。考察段階で、直前のAI応答に対して学習者が答えやすい選択肢を3つ生成してください。
-
-課題文: {task_content}
-学習者の予想: {prediction_summary}
-学習者の話し方例: {user_style}
-
-言語レベル: {language_level}
-単元: {unit}
-
-直前のAI応答: {latest_ai_response}
-
-考察対話履歴:
-"""
-            
-            # 最新の3往復分の対話を含める
-            recent_conversation = reflection_conversation[-6:] if len(reflection_conversation) > 6 else reflection_conversation
-            for msg in recent_conversation:
-                role = "学習者" if msg['role'] == 'user' else "AI"
-                suggestions_prompt += f"{role}: {msg['content']}\n"
-            
-            suggestions_prompt += f"""
-要求（考察段階 - 学習者の話し方に合わせて）:
-1. 課題文「{task_content}」に対する実験結果の考察に関連した選択肢
-2. 予想「{prediction_summary}」と実験結果の比較ができる選択肢
-3. 学習者の話し方レベル（{language_level}）に合わせた表現を使用
-4. 各選択肢は25文字以内で、学習者が実際に言いそうな表現
-5. 質問タイプ「{question_type}」に適した回答選択肢
-
-選択肢作成のガイドライン:
-- 結果確認型の質問：「〜という結果になった」「〜が観察できた」「〜の変化があった」
-- 予想比較型の質問：「予想通りだった」「予想と違った」「一部だけ合っていた」
-- 理由型の質問：「〜だから」「〜が原因で」「〜のおかげで」
-- 感想型の質問：「驚いた」「面白かった」「もっと知りたい」
-
-出力形式:
-選択肢1: [内容]
-選択肢2: [内容]  
-選択肢3: [内容]
-"""
-        
-        suggestions_response = call_gemini_with_retry(suggestions_prompt)
-        
-        # レスポンスから選択肢を抽出
-        suggestions = []
-        lines = suggestions_response.split('\n')
-        for line in lines:
-            if line.startswith('選択肢'):
-                suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-                if suggestion and len(suggestion) <= 50:
-                    suggestions.append(suggestion)
-        
-        # 選択肢が3つ未満の場合は学習者の話し方に合わせたデフォルトを追加
-        if len(suggestions) < 3:
-            # 学習者の話し方パターンを基に、考察段階に合ったデフォルト選択肢を作成
-            if user_style:
-                # 学習者が使いそうな表現を推測（考察段階用）
-                reflection_defaults = ["予想通りでした", "少し違いました", "よく分からない"]
-            else:
-                # 話し方パターンが不明な場合は汎用的な考察選択肢
-                reflection_defaults = ["そう思う", "違うと思う", "分からない"]
-            
-            for i, default in enumerate(reflection_defaults):
-                if len(suggestions) <= i:
-                    suggestions.append(default)
-        
-        return jsonify({
-            'suggestions': suggestions[:3],
-            'regenerated': is_regenerate
-        })
-        
-    except Exception as e:
-        print(f"考察選択肢生成エラー: {str(e)}")
-        default_suggestions = [
-            "予想通りでした",
-            "予想と違いました", 
-            "よくわかりませんでした"
-        ]
-        return jsonify({
-            'suggestions': default_suggestions
-        })
-        
-        # 選択肢生成用のプロンプト（文脈重視）
-        suggestions_prompt = f"""
-あなたは小学校理科の指導者です。直前のAI応答に対して、学習者（小学生）が次に答えやすい具体的な選択肢を3つ生成してください。
-
-単元: {unit}
-
-直前のAI応答:
-{latest_ai_response}
-
-最近の考察対話履歴:
-"""
-        
-        # 最新の3往復分の対話を含める
-        recent_conversation = reflection_conversation[-6:] if len(reflection_conversation) > 6 else reflection_conversation
-        for msg in recent_conversation:
-            role = "学習者" if msg['role'] == 'user' else "AI"
-            suggestions_prompt += f"{role}: {msg['content']}\n"
-        
-        suggestions_prompt += """
-要求:
-1. 直前のAI応答の内容に直接関連した選択肢を作成
-2. 実験結果や考察に関する具体的な答えを選択肢にする
-3. 各選択肢は25文字以内で簡潔に
-4. 学習者が答えやすい具体的な内容にする
-5. 「予想と結果の比較」「理由の説明」「日常生活との関連」を意識
-6. 以下の形式で出力してください：
-
-選択肢1: [内容]
-選択肢2: [内容]  
-選択肢3: [内容]
-
-例：
-AIが「予想と同じでしたか？」と聞いた場合
-→ 選択肢1: 予想通りでした
-→ 選択肢2: 予想と違いました
-→ 選択肢3: 少し違いました
-"""
-        
-        suggestions_response = call_gemini_with_retry(suggestions_prompt)
-        
-        # レスポンスから選択肢を抽出
-        suggestions = []
-        lines = suggestions_response.split('\n')
-        for line in lines:
-            if line.startswith('選択肢'):
-                # "選択肢1: " の部分を除去
-                suggestion = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-                if suggestion and len(suggestion) <= 50:  # 長すぎる選択肢を除外
-                    suggestions.append(suggestion)
-        
-        # 選択肢が3つ未満の場合は文脈に応じたデフォルトを追加
-        if len(suggestions) < 3:
-            # 直前のAI応答に基づいたデフォルト選択肢
-            if "予想" in latest_ai_response and ("同じ" in latest_ai_response or "結果" in latest_ai_response):
-                context_defaults = [
-                    "予想通りでした",
-                    "予想と違いました",
-                    "よくわからない"
-                ]
-            elif "どんな" in latest_ai_response or "詳しく" in latest_ai_response:
-                context_defaults = [
-                    "大きくなりました",
-                    "小さくなりました",
-                    "変わりませんでした"
-                ]
-            elif "日常" in latest_ai_response or "生活" in latest_ai_response:
-                context_defaults = [
-                    "タイヤの変化と似ている",
-                    "風船の変化と似ている",
-                    "よくわからない"
-                ]
-            else:
-                context_defaults = [
-                    "そう思います",
-                    "よくわかりません",
-                    "もう少し考えます"
-                ]
-            
-            for i, default in enumerate(context_defaults):
-                if len(suggestions) <= i:
-                    suggestions.append(default)
-        
-        return jsonify({
-            'suggestions': suggestions[:3]  # 最大3つまで
-        })
-        
-    except Exception as e:
-        print(f"考察選択肢生成エラー: {str(e)}")
-        # エラー時はデフォルトの選択肢を返す
-        default_suggestions = [
-            "予想通りの結果でした",
-            "予想と違う結果でした",
-            "よくわからない"
-        ]
-        return jsonify({
-            'suggestions': default_suggestions
-        })
 
 @app.route('/resume_session', methods=['GET', 'POST'])
 def resume_session():
