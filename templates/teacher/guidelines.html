@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}指導要領・資料管理{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard" style="background: var(--light-bg); min-height: 100vh; padding: 40px 0;">
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-book me-3 text-primary"></i>指導要領・資料管理</h1>
+                <div class="teacher-info">
+                    <span class="badge bg-primary me-2"><i class="fas fa-user"></i> {{ teacher_id }}</span>
+                    <a href="{{ url_for('teacher_logout') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                    </a>
+                </div>
+            </div>
+            
+            <!-- ナビゲーション -->
+            <div class="mb-4">
+                <a href="{{ url_for('teacher') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-home"></i> ダッシュボード
+                </a>
+                <a href="{{ url_for('teacher_prompts') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-edit"></i> プロンプト管理
+                </a>
+                <a href="{{ url_for('teacher_analysis') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-brain"></i> AI学習分析
+                </a>
+            </div>
+        </div>
+
+        <!-- 指導要領アップロード -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>
+                            指導要領・文科省資料アップロード
+                        </h5>
+                        <small>学習指導要領や文科省の言語活動資料をアップロードして、AI分析に活用できます</small>
+                    </div>
+                    <div class="card-body">
+                        <form id="guidelinesForm" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="documentType" class="form-label fw-bold">
+                                        <i class="fas fa-tag text-primary me-2"></i>資料タイプ
+                                    </label>
+                                    <select id="documentType" class="form-select" required>
+                                        <option value="">選択してください</option>
+                                        <option value="curriculum_guidelines">学習指導要領（理科）</option>
+                                        <option value="language_activities">言語活動に関する指導資料</option>
+                                        <option value="assessment_guidelines">評価に関する資料</option>
+                                        <option value="teaching_methods">指導方法に関する資料</option>
+                                        <option value="other">その他</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="documentTitle" class="form-label fw-bold">
+                                        <i class="fas fa-file-alt text-primary me-2"></i>資料名
+                                    </label>
+                                    <input type="text" id="documentTitle" class="form-control" 
+                                           placeholder="例：小学校学習指導要領（平成29年告示）理科編" required>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="pdfFile" class="form-label fw-bold">
+                                        <i class="fas fa-file-pdf text-primary me-2"></i>PDFファイル
+                                    </label>
+                                    <input type="file" id="pdfFile" class="form-control" accept=".pdf" required>
+                                    <div class="form-text">最大16MBまで対応</div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="documentDescription" class="form-label fw-bold">
+                                    <i class="fas fa-comment text-primary me-2"></i>資料説明（任意）
+                                </label>
+                                <textarea id="documentDescription" class="form-control" rows="3" 
+                                          placeholder="この資料の内容や活用方法について簡単に説明してください"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i>アップロード
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- アップロード済み資料一覧 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            アップロード済み資料
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="documentsList">
+                            <!-- 動的に生成される資料一覧 -->
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-folder-open fa-3x mb-3"></i>
+                                <p>まだ資料がアップロードされていません</p>
+                                <p class="small">上記のフォームから指導要領や文科省資料をアップロードしてください</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 活用ガイド -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            資料活用ガイド
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">推奨アップロード資料</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-check text-success me-2"></i>小学校学習指導要領（理科編）</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>言語活動の充実に関する指導事例集</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>学習評価の在り方ハンドブック</li>
+                                    <li><i class="fas fa-check text-success me-2"></i>問題解決的な学習指導の手引き</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-primary">AI分析への活用</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-robot text-info me-2"></i>学習目標との整合性確認</li>
+                                    <li><i class="fas fa-robot text-info me-2"></i>言語活動の充実度評価</li>
+                                    <li><i class="fas fa-robot text-info me-2"></i>評価規準に基づく分析</li>
+                                    <li><i class="fas fa-robot text-info me-2"></i>指導方法の適切性判断</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('guidelinesForm');
+    
+    // フォーム送信
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('document_type', document.getElementById('documentType').value);
+        formData.append('title', document.getElementById('documentTitle').value);
+        formData.append('description', document.getElementById('documentDescription').value);
+        formData.append('file', document.getElementById('pdfFile').files[0]);
+        
+        fetch('/teacher/guidelines/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('資料をアップロードしました', 'success');
+                form.reset();
+                loadDocumentsList();
+            } else {
+                showAlert('アップロードに失敗しました: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('エラーが発生しました: ' + error, 'danger');
+        });
+    });
+    
+    // 資料一覧を読み込み
+    loadDocumentsList();
+    
+    function loadDocumentsList() {
+        fetch('/teacher/guidelines/list')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('documentsList');
+            
+            if (data.documents && data.documents.length > 0) {
+                let html = '<div class="row">';
+                data.documents.forEach(doc => {
+                    html += `
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-left-primary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="card-title text-primary">${escapeHtml(doc.title)}</h6>
+                                            <p class="card-text">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-tag me-1"></i>${getTypeLabel(doc.type)}
+                                                </small>
+                                            </p>
+                                            ${doc.description ? `<p class="card-text small">${escapeHtml(doc.description)}</p>` : ''}
+                                            <p class="card-text">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar me-1"></i>${new Date(doc.uploaded_at).toLocaleDateString('ja-JP')}
+                                                </small>
+                                            </p>
+                                        </div>
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <button class="btn btn-outline-danger btn-sm" onclick="deleteDocument('${doc.id}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-folder-open fa-3x mb-3"></i>
+                        <p>まだ資料がアップロードされていません</p>
+                        <p class="small">上記のフォームから指導要領や文科省資料をアップロードしてください</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading documents:', error);
+        });
+    }
+    
+    function getTypeLabel(type) {
+        const types = {
+            'curriculum_guidelines': '学習指導要領',
+            'language_activities': '言語活動資料',
+            'assessment_guidelines': '評価資料',
+            'teaching_methods': '指導方法資料',
+            'other': 'その他'
+        };
+        return types[type] || 'その他';
+    }
+    
+    window.deleteDocument = function(docId) {
+        if (confirm('この資料を削除しますか？')) {
+            fetch(`/teacher/guidelines/${docId}/delete`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('資料を削除しました', 'success');
+                    loadDocumentsList();
+                } else {
+                    showAlert('削除に失敗しました: ' + data.error, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('エラーが発生しました: ' + error, 'danger');
+            });
+        }
+    };
+    
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+    
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+});
+</script>
+
+<style>
+.border-left-primary {
+    border-left: 4px solid var(--primary-color) !important;
+}
+
+.card {
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-medium);
+}
+
+.form-control, .form-select {
+    border-radius: var(--border-radius);
+    border: 2px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.1);
+}
+</style>
+{% endblock %}

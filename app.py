@@ -12,6 +12,7 @@ import certifi
 import urllib3
 import re
 import glob
+import uuid
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 
@@ -1138,8 +1139,34 @@ def resume_session():
     return render_template('resume_session.html')
 
 # ログ分析機能
+def load_guidelines_content():
+    """指導要領・資料の内容を読み込み"""
+    try:
+        index_file = 'guidelines/guidelines_index.json'
+        
+        if not os.path.exists(index_file):
+            return ""
+        
+        with open(index_file, 'r', encoding='utf-8') as f:
+            guidelines_index = json.load(f)
+        
+        # 全ての資料の内容を結合
+        combined_content = ""
+        for doc_id, doc_info in guidelines_index.items():
+            doc_type = doc_info.get('type', '')
+            title = doc_info.get('title', '')
+            content = doc_info.get('content', '')
+            
+            combined_content += f"\n【{title}】\n{content}\n"
+        
+        return combined_content[:2000]  # 最大2000文字まで
+    
+    except Exception as e:
+        print(f"指導要領読み込みエラー: {str(e)}")
+        return ""
+
 def analyze_student_learning(student_number, unit, logs):
-    """特定の学生・単元の学習過程を言語活動支援の観点でGemini分析（指導案考慮）"""
+    """特定の学生・単元の学習過程を詳細分析"""
     print(f"分析開始 - 学生: {student_number}, 単元: {unit}")
     
     # 該当する学生のログを抽出
@@ -1152,37 +1179,27 @@ def analyze_student_learning(student_number, unit, logs):
     if not student_logs:
         return {
             'evaluation': '学習データがありません',
-            'language_support_needed': ['学習活動への参加が必要です'],
             'prediction_analysis': {
-                'experience_connection': 'データなし',
-                'prior_knowledge_use': 'データなし'
+                'daily_life_connection': 'データなし - 日常体験との関連付けを確認できません',
+                'prior_knowledge_use': 'データなし - 既習事項の活用を確認できません',
+                'reasoning_quality': 'データなし - 予想の根拠を確認できません'
             },
             'reflection_analysis': {
-                'result_verbalization': 'データなし',
-                'prediction_comparison': 'データなし',
-                'daily_life_connection': 'データなし'
-            }
+                'result_verbalization': 'データなし - 結果の言語化を確認できません',
+                'prediction_comparison': 'データなし - 予想との比較を確認できません',
+                'daily_life_connection': 'データなし - 日常生活との関連付けを確認できません',
+                'scientific_understanding': 'データなし - 科学的理解を確認できません'
+            },
+            'language_development': '学習活動への参加が必要です',
+            'support_recommendations': ['学習活動への参加促進', '対話の機会提供']
         }
     
-    # 指導案の内容を取得
-    lesson_plan_content = load_lesson_plan_content(unit)
-    lesson_plan_context = ""
+    # 指導要領・資料の内容を取得
+    guidelines_content = load_guidelines_content()
+    guidelines_context = ""
     
-    if lesson_plan_content:
-        # 指導案から重要な部分を抽出（最初の1000文字程度）
-        lesson_plan_preview = lesson_plan_content[:1000]
-        lesson_plan_context = f"""
-指導案に基づく評価基準:
-{lesson_plan_preview}
-
-[指導案の内容を踏まえて]
-- 学習目標の達成度
-- 指導計画に沿った思考過程
-- 授業で重視される観点
-を含めて分析してください。
-"""
-    else:
-        lesson_plan_context = "※指導案が設定されていないため、一般的な理科学習の観点で分析します。"
+    if guidelines_content:
+        guidelines_context = f"参考指導資料: {guidelines_content[:800]}"
     
     # 対話履歴を整理
     prediction_chats = []
@@ -1211,91 +1228,118 @@ def analyze_student_learning(student_number, unit, logs):
     
     print(f"予想対話数: {len(prediction_chats)}, 考察対話数: {len(reflection_chats)}")
     
-    # 分析プロンプト作成（指導案を考慮した教育的観点）
-    analysis_prompt = f"""
-小学生の理科学習記録を詳細に評価してください。
+    # 分析プロンプト作成
+    analysis_prompt = f"""小学生の理科学習記録を詳細に分析してください。
 
 学習内容: {unit}
 学習者ID: {student_number}
 
-{lesson_plan_context}
+{guidelines_context}
 
-【予想段階の記録】
-"""
+【予想段階の記録】"""
     
-    # 予想段階の記録（詳細に）
+    # 予想段階の記録
     for i, chat in enumerate(prediction_chats, 1):
         user_msg = chat['user']
         ai_msg = chat['ai'][:100] + "..." if len(chat['ai']) > 100 else chat['ai']
-        analysis_prompt += f"予想対話{i}:\n"
-        analysis_prompt += f"  学習者: {user_msg}\n"
-        analysis_prompt += f"  AI応答: {ai_msg}\n"
+        analysis_prompt += f"\n予想対話{i}: 学習者「{user_msg}」 AI「{ai_msg}」"
     
     if prediction_summary:
-        analysis_prompt += f"\n予想まとめ: {prediction_summary}\n"
+        analysis_prompt += f"\n予想まとめ: {prediction_summary}"
     
-    # 考察段階の記録（詳細に）
-    analysis_prompt += f"\n【考察段階の記録】\n"
+    # 考察段階の記録
+    analysis_prompt += f"\n\n【考察段階の記録】"
     for i, chat in enumerate(reflection_chats, 1):
         user_msg = chat['user']
         ai_msg = chat['ai'][:100] + "..." if len(chat['ai']) > 100 else chat['ai']
-        analysis_prompt += f"考察対話{i}:\n"
-        analysis_prompt += f"  学習者: {user_msg}\n"
-        analysis_prompt += f"  AI応答: {ai_msg}\n"
+        analysis_prompt += f"\n考察対話{i}: 学習者「{user_msg}」 AI「{ai_msg}」"
     
     if final_summary:
-        analysis_prompt += f"\n最終考察: {final_summary}\n"
+        analysis_prompt += f"\n最終考察: {final_summary}"
     
     analysis_prompt += """
-【言語活動支援の分析観点】
-生成AIによる言語活動支援の効果を以下の観点で分析してください：
 
-1. 予想段階での言語化支援
-   - 日常経験や既習事項を言語として引き出せているか
-   - 根拠と予想を関連付けて表現できているか
-   - 児童の固有の経験が予想に活かされているか
+【分析観点】
+以下の観点で詳細に分析してください：
 
-2. 考察段階での言語化支援
+1. 予想段階での言語化
+   - 日常経験や既習事項を根拠として言語化できているか
+   - 予想と根拠を関連付けて表現できているか
+
+2. 考察段階での言語化
    - 実験結果を自分の言葉で表現できているか
    - 予想との差異について言語化できているか
-   - 日常生活や既習事項との関連を言葉で説明できているか
+   - 日常生活との関連を言葉で説明できているか
 
 3. 言語活動の深化
    - 対話を通じて思考が深まっているか
-   - 「書くことを通して考える」プロセスが見られるか
-   - AIの問いかけに応じて自分の言葉で説明しようと試みているか
+   - 科学的な理解が言語化されているか
 
-【出力形式】
-以下の形式で分析結果をJSON形式で出力してください：
-
+JSON形式で出力してください：
 {
-  "evaluation": "言語活動支援の観点からの総合評価",
-  "language_support_needed": ["今後の言語化支援のポイント1", "ポイント2", "ポイント3"],
+  "evaluation": "総合評価",
   "prediction_analysis": {
-    "experience_connection": "経験の言語化状況",
-    "prior_knowledge_use": "既習事項の活用と言語化"
+    "daily_life_connection": "日常体験の活用状況",
+    "prior_knowledge_use": "既習事項の活用状況",
+    "reasoning_quality": "予想の根拠の質"
   },
   "reflection_analysis": {
     "result_verbalization": "結果の言語化状況",
-    "prediction_comparison": "予想との比較の言語化",
-    "daily_life_connection": "日常生活との関連付けの言語化"
+    "prediction_comparison": "予想との比較",
+    "daily_life_connection": "日常生活との関連付け",
+    "scientific_understanding": "科学的理解の深化"
   },
-  "language_development": "言語活動の変化と成長"
-}
-"""
+  "language_development": "言語活動の変化と成長",
+  "support_recommendations": ["今後の支援ポイント"]
+}"""
     
     try:
         print("Gemini分析開始...")
         response = call_gemini_with_retry(analysis_prompt)
-        print(f"Gemini応答（前500文字）: {repr(response[:500])}")
-        print(f"Gemini応答（後500文字）: {repr(response[-500:])}")
+        print(f"Gemini応答: {response[:500]}...")
         
-        # 複数の方法でJSONを抽出
-        result = None
-        
-        # 方法1: 通常の正規表現
+        # JSONの抽出
         import re
-        json_match = re.search(r'\{.*?\}', response, re.DOTALL)
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            return json.loads(json_str)
+        else:
+            return {
+                'evaluation': f'分析結果: {response[:200]}...',
+                'prediction_analysis': {
+                    'daily_life_connection': '分析処理中',
+                    'prior_knowledge_use': '分析処理中',
+                    'reasoning_quality': '分析処理中'
+                },
+                'reflection_analysis': {
+                    'result_verbalization': '分析処理中',
+                    'prediction_comparison': '分析処理中',
+                    'daily_life_connection': '分析処理中',
+                    'scientific_understanding': '分析処理中'
+                },
+                'language_development': '分析処理中',
+                'support_recommendations': ['詳細分析を実施中']
+            }
+    
+    except Exception as e:
+        print(f"分析エラー: {str(e)}")
+        return {
+            'evaluation': f'分析エラー: {str(e)}',
+            'prediction_analysis': {
+                'daily_life_connection': 'エラーが発生しました',
+                'prior_knowledge_use': 'エラーが発生しました',
+                'reasoning_quality': 'エラーが発生しました'
+            },
+            'reflection_analysis': {
+                'result_verbalization': 'エラーが発生しました',
+                'prediction_comparison': 'エラーが発生しました',
+                'daily_life_connection': 'エラーが発生しました',
+                'scientific_understanding': 'エラーが発生しました'
+            },
+            'language_development': 'エラーが発生しました',
+            'support_recommendations': ['システム管理者に連絡してください']
+        }
         if json_match:
             json_str = json_match.group(0)
             print(f"抽出されたJSON: {json_str}")
@@ -1797,6 +1841,156 @@ def teacher_prompt_test():
     
     except Exception as e:
         return jsonify({'error': f'テストに失敗しました: {str(e)}'}), 500
+
+# 指導要領・資料管理機能
+@app.route('/teacher/guidelines')
+@require_teacher_auth
+def teacher_guidelines():
+    """指導要領・資料管理ページ"""
+    return render_template('teacher/guidelines.html',
+                         teacher_id=session.get('teacher_id'))
+
+@app.route('/teacher/guidelines/upload', methods=['POST'])
+@require_teacher_auth
+def upload_guidelines():
+    """指導要領・資料のアップロード"""
+    try:
+        document_type = request.form.get('document_type')
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        file = request.files.get('file')
+        
+        if not file or not file.filename:
+            return jsonify({'error': 'ファイルが選択されていません'}), 400
+        
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'PDFファイルのみ対応しています'}), 400
+        
+        # ファイルサイズチェック（16MB）
+        if len(file.read()) > 16 * 1024 * 1024:
+            return jsonify({'error': 'ファイルサイズが16MBを超えています'}), 400
+        
+        file.seek(0)  # ファイルポインタをリセット
+        
+        # ディレクトリ作成
+        guidelines_dir = 'guidelines'
+        os.makedirs(guidelines_dir, exist_ok=True)
+        
+        # ファイル名を安全にする
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe_filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(guidelines_dir, safe_filename)
+        
+        # ファイル保存
+        file.save(filepath)
+        
+        # PDFからテキスト抽出
+        try:
+            with open(filepath, 'rb') as pdf_file:
+                pdf_reader = PdfReader(pdf_file)
+                content = ""
+                for page in pdf_reader.pages:
+                    content += page.extract_text() + "\n"
+        except Exception as e:
+            content = f"テキスト抽出エラー: {str(e)}"
+        
+        # インデックスファイルに追加
+        index_file = os.path.join(guidelines_dir, 'guidelines_index.json')
+        
+        # 既存のインデックスを読み込み
+        if os.path.exists(index_file):
+            with open(index_file, 'r', encoding='utf-8') as f:
+                guidelines_index = json.load(f)
+        else:
+            guidelines_index = {}
+        
+        # 新しい文書情報を追加
+        doc_id = str(uuid.uuid4())
+        guidelines_index[doc_id] = {
+            'type': document_type,
+            'title': title,
+            'description': description,
+            'filename': safe_filename,
+            'filepath': filepath,
+            'content': content[:1000],  # 最初の1000文字のみ保存
+            'full_content': content,  # 全文は別途保存
+            'uploaded_at': datetime.now().isoformat(),
+            'uploaded_by': session.get('teacher_id')
+        }
+        
+        # インデックスファイルに保存
+        with open(index_file, 'w', encoding='utf-8') as f:
+            json.dump(guidelines_index, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': '資料をアップロードしました',
+            'document_id': doc_id
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'アップロードに失敗しました: {str(e)}'}), 500
+
+@app.route('/teacher/guidelines/list')
+@require_teacher_auth
+def list_guidelines():
+    """アップロード済み資料一覧"""
+    try:
+        index_file = 'guidelines/guidelines_index.json'
+        
+        if not os.path.exists(index_file):
+            return jsonify({'documents': []})
+        
+        with open(index_file, 'r', encoding='utf-8') as f:
+            guidelines_index = json.load(f)
+        
+        # 文書一覧を作成（IDを含める）
+        documents = []
+        for doc_id, doc_info in guidelines_index.items():
+            doc_info['id'] = doc_id
+            documents.append(doc_info)
+        
+        # 日付順にソート（新しい順）
+        documents.sort(key=lambda x: x.get('uploaded_at', ''), reverse=True)
+        
+        return jsonify({'documents': documents})
+    
+    except Exception as e:
+        return jsonify({'error': f'資料一覧の取得に失敗しました: {str(e)}'}), 500
+
+@app.route('/teacher/guidelines/<doc_id>/delete', methods=['DELETE'])
+@require_teacher_auth
+def delete_guidelines(doc_id):
+    """資料の削除"""
+    try:
+        index_file = 'guidelines/guidelines_index.json'
+        
+        if not os.path.exists(index_file):
+            return jsonify({'error': '資料が見つかりません'}), 404
+        
+        with open(index_file, 'r', encoding='utf-8') as f:
+            guidelines_index = json.load(f)
+        
+        if doc_id not in guidelines_index:
+            return jsonify({'error': '資料が見つかりません'}), 404
+        
+        # ファイルを削除
+        filepath = guidelines_index[doc_id]['filepath']
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        
+        # インデックスから削除
+        del guidelines_index[doc_id]
+        
+        # インデックスファイルを更新
+        with open(index_file, 'w', encoding='utf-8') as f:
+            json.dump(guidelines_index, f, ensure_ascii=False, indent=2)
+        
+        return jsonify({'success': True, 'message': '資料を削除しました'})
+    
+    except Exception as e:
+        return jsonify({'error': f'削除に失敗しました: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5014)
