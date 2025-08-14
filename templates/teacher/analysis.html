@@ -166,30 +166,17 @@
         </div>
 
         <!-- 個別学生分析リンク -->
-        <div class="individual-analysis mt-5">
-            <h3><i class="fas fa-user-graduate me-2"></i>個別学生分析</h3>
-            {% if unit_students %}
-                {% for unit_name, students in unit_students.items() %}
-                <div class="unit-section mb-4">
-                    <h5 class="unit-header">{{ unit_name }}</h5>
-                    <div class="students-grid">
-                        {% for student in students %}
-                        <a href="{{ url_for('teacher_student_analysis', student=student, unit=unit_name, date=current_date) }}" 
-                           class="student-analysis-link">
-                            <i class="fas fa-user me-2"></i>{{ student }}番
-                            <i class="fas fa-chart-bar ms-auto"></i>
-                        </a>
-                        {% endfor %}
+                </div>
+
+        <!-- 学習状況統計 -->
+        <div class="summary-stats">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-number">{{ class_analysis.total_students }}</div>
+                        <div class="stat-label">学習者数</div>
                     </div>
                 </div>
-                {% endfor %}
-            {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    分析対象となる学習データがありません。
-                </div>
-            {% endif %}
-        </div>
     </div>
 </div>
 

@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}学習者対話ログ ダッシュボード{% endblock %}
+
+{% block content %}
+<div class="log-dashboard-page">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="dashboard-header text-center mb-4">
+                    <h2 class="mb-3">
+                        <i class="fas fa-comments text-primary"></i>
+                        学習者対話ログ ダッシュボード
+                    </h2>
+                    <p class="text-muted">学習者との対話履歴を確認できます</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 学習者選択 -->
+            <div class="col-md-3">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-user"></i> 学習者選択</h5>
+                    </div>
+                    <div class="card-body">
+                        <select id="studentSelect" class="form-select mb-3">
+                            <option value="">学習者を選択...</option>
+                            {% for student in students %}
+                            <option value="{{ student }}">出席番号 {{ student }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="loadLogsBtn" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-download"></i> 対話ログ読み込み
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 学習統計サマリー -->
+            <div class="col-md-9">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar"></i> 学習統計</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="summaryCards">
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="totalInteractions">--</div>
+                                    <div class="stat-label">総対話回数</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="unitsCovered">--</div>
+                                    <div class="stat-label">学習した単元</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="sessionsCount">--</div>
+                                    <div class="stat-label">学習セッション</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="latestActivity">--</div>
+                                    <div class="stat-label">最新活動</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 対話履歴 -->
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-history"></i> 対話履歴</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="interactionHistory" style="height: 500px; overflow-y: auto;">
+                            <div class="text-center text-muted pt-5">
+                                学習者を選択してください
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 学習した単元 -->
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-book"></i> 学習単元</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="unitsList">
+                            <div class="text-center text-muted">
+                                データがありません
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 教員向けアドバイス -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="fas fa-lightbulb text-warning"></i> 指導アドバイス</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="teacherAdvice">
+                            <div class="text-center text-muted">
+                                学習者データを読み込むとアドバイスが表示されます
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.interaction-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #fff;
+}
+
+.interaction-meta {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.user-input {
+    background: #e3f2fd;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+}
+
+.ai-response {
+    background: #f1f8e9;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+}
+
+.unit-badge {
+    display: inline-block;
+    background: #007bff;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    margin: 0.25rem;
+}
+
+.advice-item {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStudentId = null;
+let logData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('loadLogsBtn').addEventListener('click', loadStudentLogs);
+});
+
+function loadStudentLogs() {
+    const studentId = document.getElementById('studentSelect').value;
+    if (!studentId) {
+        alert('学習者を選択してください');
+        return;
+    }
+    
+    currentStudentId = studentId;
+    
+    // 対話ログを読み込み
+    fetch('/teacher/twin/load', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ student_id: studentId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('エラー: ' + data.error);
+        } else {
+            logData = data;
+            updateDashboard(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('データの読み込みに失敗しました');
+    });
+}
+
+function updateDashboard(data) {
+    const stats = data.stats;
+    
+    // 統計カードの更新
+    document.getElementById('totalInteractions').textContent = stats.total_interactions;
+    document.getElementById('unitsCovered').textContent = stats.units_covered;
+    document.getElementById('sessionsCount').textContent = stats.sessions;
+    
+    // 最新活動日時の表示
+    if (stats.latest_activity) {
+        const date = new Date(stats.latest_activity);
+        document.getElementById('latestActivity').textContent = 
+            date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+    } else {
+        document.getElementById('latestActivity').textContent = '---';
+    }
+    
+    // 対話履歴の表示
+    renderInteractionHistory(data.interactions);
+    
+    // 単元リストの表示
+    renderUnitsList(data.units);
+    
+    // 教員アドバイスの生成
+    generateTeacherAdvice(data);
+}
+
+function renderInteractionHistory(interactions) {
+    const container = document.getElementById('interactionHistory');
+    container.innerHTML = '';
+    
+    if (!interactions || interactions.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">対話履歴がありません</div>';
+        return;
+    }
+    
+    interactions.slice(-10).reverse().forEach(interaction => {
+        const item = document.createElement('div');
+        item.className = 'interaction-item';
+        
+        const timestamp = new Date(interaction.timestamp).toLocaleString('ja-JP');
+        
+        item.innerHTML = `
+            <div class="interaction-meta">
+                <strong>${interaction.unit || '単元不明'}</strong> - ${interaction.phase || '段階不明'} 
+                <span class="float-end">${timestamp}</span>
+            </div>
+            <div class="user-input">
+                <strong>学習者:</strong> ${interaction.user_input || '入力なし'}
+            </div>
+            <div class="ai-response">
+                <strong>AI応答:</strong> ${interaction.ai_response ? interaction.ai_response.substring(0, 200) + '...' : '応答なし'}
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+function renderUnitsList(units) {
+    const container = document.getElementById('unitsList');
+    container.innerHTML = '';
+    
+    if (!units || units.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">学習した単元がありません</div>';
+        return;
+    }
+    
+    units.forEach(unit => {
+        const badge = document.createElement('span');
+        badge.className = 'unit-badge';
+        badge.textContent = unit;
+        container.appendChild(badge);
+    });
+}
+
+function generateTeacherAdvice(data) {
+    const container = document.getElementById('teacherAdvice');
+    container.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> アドバイスを生成中...</div>';
+    
+    // アドバイスを生成
+    fetch('/teacher/twin/recommendations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            student_id: currentStudentId,
+            twin_data: data 
+        })
+    })
+    .then(response => response.json())
+    .then(advice => {
+        container.innerHTML = '';
+        
+        advice.forEach(item => {
+            const adviceItem = document.createElement('div');
+            adviceItem.className = 'advice-item';
+            adviceItem.innerHTML = `
+                <h6><i class="fas fa-lightbulb"></i> ${item.title}</h6>
+                <p class="mb-0">${item.description}</p>
+            `;
+            container.appendChild(adviceItem);
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        container.innerHTML = '<div class="text-danger">アドバイスの生成に失敗しました</div>';
+    });
+}
+</script>
+{% endblock %}

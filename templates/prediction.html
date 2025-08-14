@@ -92,9 +92,67 @@
 let conversationCount = 0;
 let lastMessage = '';
 
+// デジタル学習ツイン用の入力行動追跡
+let inputBehaviorTracker = {
+    startTime: null,
+    keystrokes: [],
+    pauses: 0,
+    backspaces: 0,
+    
+    startTracking: function() {
+        this.startTime = Date.now();
+        this.keystrokes = [];
+        this.pauses = 0;
+        this.backspaces = 0;
+    },
+    
+    recordKeystroke: function(key) {
+        const now = Date.now();
+        
+        if (this.keystrokes.length > 0) {
+            const timeSinceLastKey = now - this.keystrokes[this.keystrokes.length - 1].timestamp;
+            if (timeSinceLastKey > 2000) { // 2秒以上の間隔はためらいとみなす
+                this.pauses++;
+            }
+        }
+        
+        if (key === 'Backspace') {
+            this.backspaces++;
+        }
+        
+        this.keystrokes.push({
+            key: key,
+            timestamp: now
+        });
+    },
+    
+    getMetadata: function() {
+        const totalTime = this.startTime ? (Date.now() - this.startTime) / 1000 : 0;
+        const typingSpeed = this.keystrokes.length > 0 ? this.keystrokes.length / totalTime : 0;
+        
+        return {
+            typing_speed: typingSpeed,
+            pause_count: this.pauses,
+            backspace_count: this.backspaces,
+            thinking_time: totalTime
+        };
+    }
+};
+
 // ページ読み込み時にAPI接続をテスト
 document.addEventListener('DOMContentLoaded', function() {
     testApiConnection();
+    
+    // 入力フィールドにイベントリスナーを追加
+    const messageInput = document.getElementById('messageInput');
+    
+    messageInput.addEventListener('focus', function() {
+        inputBehaviorTracker.startTracking();
+    });
+    
+    messageInput.addEventListener('keydown', function(e) {
+        inputBehaviorTracker.recordKeystroke(e.key);
+    });
 });
 
 document.getElementById('sendButton').addEventListener('click', sendMessage);
@@ -208,9 +266,13 @@ function sendMessageToAPI(message) {
     const loadingMessage = addMessage('考え中...', 'ai');
     loadingMessage.classList.add('loading-message');
     
+    // 入力行動メタデータを取得
+    const inputMetadata = inputBehaviorTracker.getMetadata();
+    
     // APIリクエストデータ
     const requestData = { 
-        message: message
+        message: message,
+        metadata: inputMetadata  // デジタル学習ツイン用データ
     };
     
     // AIの応答を取得
@@ -240,6 +302,12 @@ function sendMessageToAPI(message) {
             addMessage(data.response, 'ai');
             conversationCount++;
             
+            // デジタル学習ツインのインサイトを表示（開発時のみ）
+            if (data.twin_insights && window.location.hostname === 'localhost') {
+                console.log('学習ツイン分析:', data.twin_insights);
+                displayTwinInsights(data.twin_insights);
+            }
+            
             if (data.suggest_summary) {
                 document.getElementById('summaryButton').style.display = 'block';
             }
@@ -260,6 +328,28 @@ function sendMessageToAPI(message) {
         // API接続テストを実行
         testApiConnection();
     });
+}
+
+function displayTwinInsights(insights) {
+    // 開発・デバッグ用のインサイト表示
+    const insightDiv = document.createElement('div');
+    insightDiv.className = 'twin-insights mt-2 p-2 bg-light rounded small';
+    insightDiv.innerHTML = `
+        <strong>🧠 学習分析:</strong><br>
+        自信度: ${(insights.confidence_level * 100).toFixed(0)}%<br>
+        思考パターン: ${insights.thinking_pattern.join(', ')}<br>
+        ためらいレベル: ${insights.hesitation_level}
+    `;
+    
+    const chatContainer = document.querySelector('.chat-container');
+    chatContainer.appendChild(insightDiv);
+    
+    // 5秒後に削除
+    setTimeout(() => {
+        if (insightDiv.parentNode) {
+            insightDiv.parentNode.removeChild(insightDiv);
+        }
+    }, 5000);
 }
 
 function getSummary() {
@@ -288,5 +378,132 @@ function getSummary() {
         document.getElementById('summaryButton').disabled = false;
     });
 }
+
+// デジタル学習ツイン統合
+class LearningTwinIntegration {
+    constructor() {
+        this.messageStartTime = null;
+        this.isTyping = false;
+        this.setupTypingDetection();
+    }
+    
+    setupTypingDetection() {
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            messageInput.addEventListener('focus', () => {
+                this.messageStartTime = Date.now();
+            });
+            
+            messageInput.addEventListener('input', () => {
+                this.isTyping = true;
+            });
+            
+            messageInput.addEventListener('blur', () => {
+                this.isTyping = false;
+            });
+        }
+    }
+    
+    getResponseTime() {
+        if (this.messageStartTime) {
+            return (Date.now() - this.messageStartTime) / 1000;
+        }
+        return 5.0; // デフォルト値
+    }
+    
+    async updateTwinRealtime(message) {
+        try {
+            const responseTime = this.getResponseTime();
+            const metadata = {
+                response_time: responseTime,
+                typing_duration: responseTime,
+                message_length: message.length,
+                timestamp: new Date().toISOString()
+            };
+            
+            const response = await fetch('/teacher/twin/realtime-update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    student_id: this.getStudentId(),
+                    message: message,
+                    response_time: responseTime,
+                    context: {
+                        phase: 'prediction',
+                        unit: this.getCurrentUnit(),
+                        timestamp: new Date().toISOString()
+                    }
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.displayTwinInsights(data);
+            }
+        } catch (error) {
+            console.log('Learning twin update failed:', error);
+            // エラーは表示せず、サイレントに処理
+        }
+    }
+    
+    displayTwinInsights(data) {
+        // 先生用のリアルタイム洞察を表示（デバッグ目的）
+        if (window.location.search.includes('debug=true')) {
+            const analysis = data.analysis;
+            const insights = document.createElement('div');
+            insights.className = 'alert alert-info mt-2';
+            insights.innerHTML = `
+                <small>
+                    <strong>🧠 学習ツイン分析:</strong><br>
+                    確信度: ${Math.round(analysis.confidence_level * 100)}% | 
+                    ためらい: ${Math.round(analysis.hesitation_level * 100)}% | 
+                    概念: ${analysis.concept_mentions.join(', ') || 'なし'}
+                </small>
+            `;
+            
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.appendChild(insights);
+            
+            // 5秒後に削除
+            setTimeout(() => {
+                if (insights.parentNode) {
+                    insights.parentNode.removeChild(insights);
+                }
+            }, 5000);
+        }
+    }
+    
+    getStudentId() {
+        // セッションから学習者IDを取得（実装により異なる）
+        return document.body.dataset.studentId || '1';
+    }
+    
+    getCurrentUnit() {
+        const unitBadge = document.querySelector('.badge');
+        return unitBadge ? unitBadge.textContent : '';
+    }
+}
+
+// 学習ツイン統合を初期化
+const twinIntegration = new LearningTwinIntegration();
+
+// 既存のsendMessage関数を拡張
+const originalSendMessage = window.sendMessage;
+window.sendMessage = function() {
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
+    
+    if (message) {
+        // 学習ツインをリアルタイム更新
+        twinIntegration.updateTwinRealtime(message);
+    }
+    
+    // 元の関数を実行
+    if (originalSendMessage) {
+        return originalSendMessage();
+    }
+};
 </script>
 {% endblock %}

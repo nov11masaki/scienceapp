@@ -11,6 +11,7 @@ import ssl
 import certifi
 import urllib3
 import re
+import glob
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 
@@ -391,6 +392,49 @@ def load_task_content(unit_name):
     except FileNotFoundError:
         return f"{unit_name}について実験を行います。どのような結果になると予想しますか？"
 
+# 単元ごとのプロンプトを読み込む関数
+def load_unit_prompt(unit_name):
+    """単元専用のプロンプトファイルを読み込む"""
+    try:
+        with open(f'prompts/{unit_name}.md', 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+        
+        # Markdownファイルの内容をプロンプトとして使用
+        # ## 単元固有の指導ポイント以降の内容を抽出
+        lines = content.split('\n')
+        prompt_parts = []
+        current_section = ""
+        
+        for line in lines:
+            if line.startswith('## '):
+                current_section = line[3:].strip()
+                if current_section in ['役割設定', '基本指針', '対話の進め方', '絶対に守ること']:
+                    prompt_parts.append(line)
+            elif current_section in ['役割設定', '基本指針', '対話の進め方', '絶対に守ること']:
+                prompt_parts.append(line)
+        
+        return '\n'.join(prompt_parts)
+    
+    except FileNotFoundError:
+        # フォールバック: デフォルトプロンプト
+        return """
+あなたは小学生向けの産婆法（ソクラテス式問答法）を実践する理科指導者です。小学生のレベルに合わせた簡単な質問で、学習者自身に気づかせることが目的です。
+
+## 基本指針
+- 1つずつ聞く - 複数の質問を同時にしない
+- 身近な例で考えさせる
+- 学習者の発言を受け止める - まず肯定してから次の質問
+- 経験を聞く - 「前に見たことある？」「どんな時に？」
+
+## 絶対に守ること
+- 1文で短く質問する（20文字以内を目指す）
+- 小学生が知らない専門用語は使わない
+- 複雑な例え話はしない
+- 1回に1つのことだけ聞く
+- JSON形式では絶対に回答しない
+- 普通の文章で質問する
+"""
+
 # 学習ログを保存する関数
 def save_learning_log(student_number, unit, log_type, data):
     """学習ログをJSONファイルに保存"""
@@ -486,46 +530,23 @@ def prediction():
 @app.route('/chat', methods=['POST'])
 def chat():
     user_message = request.json.get('message')
+    input_metadata = request.json.get('metadata', {})
     conversation = session.get('conversation', [])
     unit = session.get('unit')
     task_content = session.get('task_content')
+    student_number = session.get('student_number')
     
     # 対話履歴に追加
     conversation.append({'role': 'user', 'content': user_message})
     
-    # Gemini APIへのプロンプト作成（小学生向け産婆法）
-    system_prompt = f"""
-あなたは小学生向けの産婆法（ソクラテス式問答法）を実践する理科指導者です。小学生のレベルに合わせた簡単な質問で、学習者自身に気づかせることが目的です。
+    # 単元ごとのプロンプトを読み込み
+    unit_prompt = load_unit_prompt(unit)
+    
+    # プロンプト作成
+    system_prompt = f"""{unit_prompt}
 
 現在の学習単元: {unit}
 課題: {task_content}
-
-小学生向け産婆法の指針:
-1. **簡単な質問から始める** - 「どうだった？」「何が見えた？」
-2. **1つずつ聞く** - 複数の質問を同時にしない
-3. **身近な例で考えさせる** - 風船、ボール、タイヤなど日常のもの
-4. **「なぜ？」は優しく** - 「どうしてそう思う？」「何を見てそう思った？」
-5. **学習者の発言を受け止める** - まず肯定してから次の質問
-6. **経験を聞く** - 「前に見たことある？」「どんな時に？」
-
-対話の進め方:
-- 1-2回目: 実験結果を具体的に聞く「何が起こった？」
-- 3-4回目: 経験と結びつける「いつ、そんなことを見た？」
-- 5回目以降: 理由を考えさせる「どうしてそうなったと思う？」
-
-**絶対に守ること:**
-- 1文で短く質問する（20文字以内を目指す）
-- 小学生が知らない専門用語は使わない
-- 複雑な例え話はしない
-- 1回に1つのことだけ聞く
-- JSON形式では絶対に回答しない
-- 普通の文章で質問する
-
-**回答例:**
-「どんなことが起こりましたか？」
-「前に似たことを見たことはありますか？」
-「どうしてそう思いますか？」
-
 対話回数: {len(conversation)}回目
 
 次の質問を普通の文章で1文で書いてください："""
@@ -556,17 +577,21 @@ def chat():
             data={
                 'user_message': user_message,
                 'ai_response': ai_message,
-                'conversation_count': len(conversation) // 2
+                'conversation_count': len(conversation) // 2,
+                'used_suggestion': False,
+                'suggestion_index': None
             }
         )
         
         # 対話が3回以上の場合、予想のまとめを提案
         suggest_summary = len(conversation) >= 6  # user + AI で1セット
         
-        return jsonify({
+        response_data = {
             'response': ai_message,
             'suggest_summary': suggest_summary
-        })
+        }
+        
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"チャットエラー: {str(e)}")
@@ -986,53 +1011,6 @@ def teacher_logs():
                          current_date=date,
                          current_unit=unit,
                          current_student=student,
-                         available_dates=available_dates,
-                         teacher_id=session.get('teacher_id'))
-
-@app.route('/teacher/student/<student_number>')
-@require_teacher_auth
-def teacher_student_detail(student_number):
-    """特定の学生の詳細"""
-    unit = request.args.get('unit')
-    
-    # デフォルト日付を最新のログがある日付に設定
-    available_dates = get_available_log_dates()
-    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
-    
-    date = request.args.get('date', default_date)
-    
-    print(f"学生詳細ページ - 学生番号: {student_number}, 単元: {unit}, 日付: {date}")
-    
-    logs = load_learning_logs(date)
-    print(f"読み込んだログ数: {len(logs)}")
-    
-    # unitパラメータがある場合のみフィルタリング
-    if unit:
-        student_logs = [log for log in logs 
-                       if log.get('student_number') == student_number 
-                       and log.get('unit') == unit]
-        print(f"単元フィルタ後のログ数: {len(student_logs)}")
-    else:
-        # unitが指定されていない場合は、その学生の全ログを表示
-        student_logs = [log for log in logs 
-                       if log.get('student_number') == student_number]
-        print(f"学生フィルタ後のログ数: {len(student_logs)}")
-    
-    # ログを時系列で並べる
-    student_logs.sort(key=lambda x: x.get('timestamp', ''))
-    
-    # デバッグ: 最初の数件のログ情報を出力
-    for i, log in enumerate(student_logs[:3]):
-        print(f"ログ{i+1}: {log.get('log_type')} - {log.get('unit')} - {log.get('timestamp')}")
-    
-    # 利用可能なログ日付を取得
-    available_dates = get_available_log_dates()
-    
-    return render_template('teacher/student_detail.html',
-                         student_number=student_number,
-                         unit=unit,
-                         logs=student_logs,
-                         date=date,
                          available_dates=available_dates,
                          teacher_id=session.get('teacher_id'))
 
@@ -1668,58 +1646,6 @@ def teacher_analysis():
                          available_dates=available_dates,
                          teacher_id=session.get('teacher_id'))
 
-@app.route('/teacher/analysis/student')
-@require_teacher_auth
-def teacher_student_analysis():
-    """個別学生の詳細分析"""
-    student_number = request.args.get('student') or request.args.get('student_number')
-    unit = request.args.get('unit')
-    
-    # デフォルト日付を最新のログがある日付に設定
-    available_dates = get_available_log_dates()
-    default_date = available_dates[0]['raw'] if available_dates else datetime.now().strftime('%Y%m%d')
-    
-    date = request.args.get('date', default_date)
-    
-    print(f"個別学生分析 - 学生番号: {student_number}, 単元: {unit}, 日付: {date}")
-    
-    if not student_number:
-        flash('学生番号を指定してください', 'error')
-        return redirect(url_for('teacher_analysis'))
-    
-    logs = load_learning_logs(date)
-    print(f"読み込んだログ数: {len(logs)}")
-    
-    # unitが指定されていない場合は、最初に見つかった単元を使用
-    if not unit:
-        student_logs_all = [log for log in logs if log.get('student_number') == student_number]
-        if student_logs_all:
-            unit = student_logs_all[0].get('unit')
-            print(f"単元が指定されていないため、最初の単元を使用: {unit}")
-        else:
-            flash('指定された学生の学習データが見つかりません', 'error')
-            return redirect(url_for('teacher_analysis'))
-    
-    # 個別学生分析
-    student_analysis = analyze_student_learning(student_number, unit, logs)
-    
-    # 該当する学生のログも取得
-    student_logs = [log for log in logs 
-                   if log.get('student_number') == student_number 
-                   and log.get('unit') == unit]
-    
-    # ログを時系列で並べる
-    student_logs.sort(key=lambda x: x.get('timestamp', ''))
-    
-    return render_template('teacher/student_analysis.html',
-                         student_analysis=student_analysis,
-                         student_number=student_number,
-                         unit=unit,
-                         logs=student_logs,
-                         date=date,
-                         available_dates=available_dates,
-                         teacher_id=session.get('teacher_id'))
-
 @app.route('/teacher/analysis/api/student', methods=['POST'])
 @require_teacher_auth
 def api_student_analysis():
@@ -1778,5 +1704,99 @@ def get_available_log_dates():
     dates.sort(key=lambda x: x['raw'], reverse=True)
     return dates
 
+# プロンプト管理機能
+@app.route('/teacher/prompts')
+@require_teacher_auth
+def teacher_prompts():
+    """プロンプト管理ページ"""
+    return render_template('teacher/prompts.html', 
+                         units=UNITS,
+                         teacher_id=session.get('teacher_id'))
+
+@app.route('/teacher/prompts/<unit>')
+@require_teacher_auth
+def teacher_prompt_edit(unit):
+    """特定単元のプロンプト編集ページ"""
+    if unit not in UNITS:
+        flash('存在しない単元です', 'error')
+        return redirect(url_for('teacher_prompts'))
+    
+    # 現在のプロンプト内容を読み込み
+    try:
+        with open(f'prompts/{unit}.md', 'r', encoding='utf-8') as f:
+            current_content = f.read()
+    except FileNotFoundError:
+        # ファイルが存在しない場合はテンプレートをコピー
+        try:
+            with open('prompts/template.md', 'r', encoding='utf-8') as f:
+                current_content = f.read()
+        except FileNotFoundError:
+            current_content = "# プロンプトテンプレートが見つかりません"
+    
+    return render_template('teacher/prompt_edit.html',
+                         unit=unit,
+                         content=current_content,
+                         teacher_id=session.get('teacher_id'))
+
+@app.route('/teacher/prompts/<unit>/save', methods=['POST'])
+@require_teacher_auth
+def teacher_prompt_save(unit):
+    """プロンプトを保存"""
+    if unit not in UNITS:
+        return jsonify({'error': 'Invalid unit'}), 400
+    
+    content = request.json.get('content', '')
+    
+    try:
+        # プロンプトディレクトリが存在しない場合は作成
+        os.makedirs('prompts', exist_ok=True)
+        
+        # ファイルに保存
+        with open(f'prompts/{unit}.md', 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return jsonify({'success': True, 'message': 'プロンプトを保存しました'})
+    
+    except Exception as e:
+        return jsonify({'error': f'保存に失敗しました: {str(e)}'}), 500
+
+@app.route('/teacher/prompts/test', methods=['POST'])
+@require_teacher_auth
+def teacher_prompt_test():
+    """プロンプトをテスト"""
+    data = request.json
+    unit = data.get('unit')
+    content = data.get('content', '')
+    test_message = data.get('message', 'テストメッセージです')
+    
+    if unit not in UNITS:
+        return jsonify({'error': 'Invalid unit'}), 400
+    
+    try:
+        # 編集中のプロンプトを使用してテスト
+        test_prompt = f"""{content}
+
+現在の学習単元: {unit}
+課題: テスト用の課題文です
+対話回数: 1回目
+
+学習者からのメッセージ: {test_message}
+
+次の質問を普通の文章で1文で書いてください："""
+        
+        # Gemini APIでテスト
+        response = call_gemini_with_retry(test_prompt)
+        clean_response = extract_message_from_json_response(response)
+        clean_response = remove_markdown_formatting(clean_response)
+        
+        return jsonify({
+            'success': True,
+            'response': clean_response,
+            'prompt_preview': content[:200] + '...' if len(content) > 200 else content
+        })
+    
+    except Exception as e:
+        return jsonify({'error': f'テストに失敗しました: {str(e)}'}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5011)
+    app.run(debug=True, port=5014)

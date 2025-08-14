@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}プロンプト編集 - {{ unit }}{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard" style="background: var(--light-bg); min-height: 100vh; padding: 40px 0;">
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-edit me-3 text-primary"></i>プロンプト編集</h1>
+                <div class="teacher-info">
+                    <span class="badge bg-primary me-2"><i class="fas fa-user"></i> {{ teacher_id }}</span>
+                    <a href="{{ url_for('teacher_logout') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                    </a>
+                </div>
+            </div>
+            
+            <!-- ナビゲーション -->
+            <div class="mb-4">
+                <a href="{{ url_for('teacher') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-home"></i> ダッシュボード
+                </a>
+                <a href="{{ url_for('teacher_prompts') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-arrow-left"></i> プロンプト管理
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-flask me-2"></i>
+                            {{ unit }} - 対話プロンプト編集
+                        </h5>
+                        <small>AIの質問生成に使用されるプロンプトをカスタマイズできます</small>
+                    </div>
+                    <div class="card-body">
+                        <form id="promptForm">
+                            <input type="hidden" id="unit" value="{{ unit }}">
+                            
+                            <div class="mb-4">
+                                <label for="promptContent" class="form-label fw-bold">
+                                    <i class="fas fa-file-text text-primary me-2"></i>
+                                    プロンプト内容（Markdown形式）
+                                </label>
+                                <textarea id="promptContent" class="form-control" rows="20" 
+                                          placeholder="プロンプト内容をMarkdown形式で入力してください...">{{ content }}</textarea>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle text-info me-1"></i>
+                                    Markdown記法が使用できます。見出し（#）、リスト（-）、強調（**）などが活用できます。
+                                    <br>
+                                    <i class="fas fa-file-alt text-warning me-1"></i>
+                                    編集内容は <code>prompts/{{ unit }}.md</code> に保存されます。
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>保存
+                                </button>
+                                <button type="button" id="testBtn" class="btn btn-outline-success">
+                                    <i class="fas fa-play me-2"></i>プロンプトをテスト
+                                </button>
+                                <button type="button" id="previewBtn" class="btn btn-outline-info">
+                                    <i class="fas fa-eye me-2"></i>プレビュー
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- テスト結果表示エリア -->
+                        <div id="testResult" class="mt-4" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-robot text-success me-2"></i>
+                                        プロンプトテスト結果
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="testOutput"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- プレビュー表示エリア -->
+                        <div id="previewResult" class="mt-4" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-eye text-info me-2"></i>
+                                        Markdownプレビュー
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="previewOutput"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 編集ガイド -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-question-circle me-2"></i>
+                            プロンプト編集ガイド
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">基本構成</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>役割定義</strong>: AIの役割を明確に定義</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>教育目標</strong>: その単元の学習目標</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>指導方針</strong>: 対話の進め方や注意点</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>質問例</strong>: 効果的な質問パターン</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-primary">記述のポイント</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>具体的に</strong>: 抽象的でなく具体的な表現を使用</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>年齢適応</strong>: 小学生にわかりやすい表現</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>誤解対策</strong>: よくある誤解への対処法</li>
+                                    <li><i class="fas fa-angle-right text-muted me-2"></i><strong>実体験重視</strong>: 身近な例との関連付け</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('promptForm');
+    const testBtn = document.getElementById('testBtn');
+    const previewBtn = document.getElementById('previewBtn');
+    const testResult = document.getElementById('testResult');
+    const previewResult = document.getElementById('previewResult');
+    
+    // フォーム送信
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const unit = document.getElementById('unit').value;
+        const content = document.getElementById('promptContent').value;
+        
+        fetch(`/teacher/prompts/${unit}/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                content: content
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('プロンプトを保存しました', 'success');
+            } else {
+                showAlert('保存に失敗しました: ' + data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('エラーが発生しました: ' + error, 'danger');
+        });
+    });
+    
+    // プロンプトテスト
+    testBtn.addEventListener('click', function() {
+        const unit = document.getElementById('unit').value;
+        const content = document.getElementById('promptContent').value;
+        
+        showLoading(testBtn, 'テスト中...');
+        testResult.style.display = 'none';
+        
+        fetch(`/teacher/prompts/test`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                unit: unit,
+                content: content,
+                message: 'テスト用メッセージ：水の温度を上げるとどうなると思いますか？'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading(testBtn, '<i class="fas fa-play me-2"></i>プロンプトをテスト');
+            
+            if (data.success) {
+                document.getElementById('testOutput').innerHTML = 
+                    '<div class="alert alert-success"><strong>テスト成功!</strong><br>' + 
+                    '<div class="mt-2"><strong>AI応答:</strong></div>' +
+                    '<div class="p-3 bg-white border rounded">' + escapeHtml(data.response) + '</div>' +
+                    '<div class="mt-2"><small class="text-muted"><strong>使用されたプロンプト（抜粋）:</strong><br>' + 
+                    escapeHtml(data.prompt_preview || 'プロンプトプレビューが利用できません') + '</small></div></div>';
+                testResult.style.display = 'block';
+            } else {
+                document.getElementById('testOutput').innerHTML = 
+                    '<div class="alert alert-danger"><strong>テスト失敗:</strong> ' + 
+                    escapeHtml(data.error) + '</div>';
+                testResult.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            hideLoading(testBtn, '<i class="fas fa-play me-2"></i>プロンプトをテスト');
+            document.getElementById('testOutput').innerHTML = 
+                '<div class="alert alert-danger"><strong>エラー:</strong> ' + 
+                escapeHtml(error.toString()) + '</div>';
+            testResult.style.display = 'block';
+        });
+    });
+    
+    // プレビュー機能
+    previewBtn.addEventListener('click', function() {
+        const content = document.getElementById('promptContent').value;
+        
+        // 簡単なMarkdownプレビュー（基本的な変換のみ）
+        let html = content
+            .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+            .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+            .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^\* (.*)$/gm, '<li>$1</li>')
+            .replace(/^- (.*)$/gm, '<li>$1</li>')
+            .replace(/\n/g, '<br>');
+        
+        // リストをulで囲む（連続するliタグをulで囲む）
+        html = html.replace(/(<li>.*?<\/li>(?:<br><li>.*?<\/li>)*)/g, '<ul>$1</ul>');
+        // 残ったbrタグを除去
+        html = html.replace(/<br>(?=<ul>)|(?<=<\/ul>)<br>/g, '');
+        
+        document.getElementById('previewOutput').innerHTML = html;
+        previewResult.style.display = 'block';
+    });
+    
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 3000);
+    }
+    
+    function showLoading(button, text) {
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + text;
+    }
+    
+    function hideLoading(button, originalHtml) {
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+    }
+    
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+});
+</script>
+
+<style>
+.form-control {
+    border-radius: var(--border-radius);
+    border: 2px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.1);
+}
+
+#promptContent {
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+#previewOutput {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    background: white;
+}
+
+#testOutput pre {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: var(--border-radius);
+    padding: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.alert {
+    border-radius: var(--border-radius);
+    border: none;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}プロンプト管理{% endblock %}
+
+{% block content %}
+<div class="teacher-dashboard" style="background: var(--light-bg); min-height: 100vh; padding: 40px 0;">
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-edit me-3 text-primary"></i>プロンプト管理</h1>
+                <div class="teacher-info">
+                    <span class="badge bg-primary me-2"><i class="fas fa-user"></i> {{ teacher_id }}</span>
+                    <a href="{{ url_for('teacher_logout') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> ログアウト
+                    </a>
+                </div>
+            </div>
+            
+            <!-- ナビゲーション -->
+            <div class="mb-4">
+                <a href="{{ url_for('teacher') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-home"></i> ダッシュボード
+                </a>
+                <a href="{{ url_for('teacher_logs') }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-list"></i> ログ一覧
+                </a>
+                <button class="btn btn-primary">
+                    <i class="fas fa-edit"></i> プロンプト管理
+                </button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-graduation-cap me-2"></i>
+                    学習単元別プロンプト管理
+                </h5>
+                <small>各単元の対話プロンプトを個別にカスタマイズできます</small>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    <i class="fas fa-info-circle text-info me-2"></i>
+                    単元をクリックして、その単元専用の対話プロンプトを編集できます。
+                    プロンプトはMarkdown形式で記述され、AIの質問生成に使用されます。
+                </p>
+
+                <div class="row">
+                    {% for unit in units %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="prompt-unit-card">
+                            <div class="card h-100 border-0 shadow-sm hover-card">
+                                <div class="card-body text-center">
+                                    <div class="prompt-icon mb-3">
+                                        <i class="fas fa-flask text-primary" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    <h6 class="card-title fw-bold">{{ unit }}</h6>
+                                    <p class="card-text text-muted small">
+                                        対話プロンプトを編集
+                                    </p>
+                                    <a href="{{ url_for('teacher_prompt_edit', unit=unit) }}" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-edit me-1"></i>編集
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-5 p-4 bg-light rounded">
+                    <h6 class="text-primary">
+                        <i class="fas fa-lightbulb me-2"></i>プロンプト編集のポイント
+                    </h6>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>単元固有の指導ポイント</strong>: その単元で特に重要な概念や注意点を記述
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>想定される誤解</strong>: 学習者がよく持つ誤解や つまずきポイントを記述
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>日常体験との関連</strong>: 身近な例や体験と結びつけるポイントを記述
+                        </li>
+                        <li>
+                            <i class="fas fa-check text-success me-2"></i>
+                            <strong>効果的な質問例</strong>: その単元でよく使える質問パターンを記述
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-card {
+    transition: var(--transition);
+}
+
+.hover-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-medium) !important;
+}
+
+.prompt-unit-card .card {
+    border-radius: var(--border-radius);
+    border: 2px solid var(--border-color);
+}
+
+.prompt-unit-card .card:hover {
+    border-color: var(--primary-color);
+}
+
+.prompt-icon {
+    opacity: 0.8;
+}
+</style>
+{% endblock %}

@@ -1,35 +1,44 @@
-/* メインカラー */
+/* 小学生と教員に優しいUIデザイン - 白ベース＋水色 */
 :root {
-    --primary-color: #4a90e2;
-    --secondary-color: #f39c12;
-    --success-color: #2ecc71;
-    --danger-color: #e74c3c;
-    --warning-color: #f1c40f;
-    --info-color: #3498db;
-    --light-color: #ecf0f1;
-    --light-bg: #f8f9fa;
-    --dark-color: #2c3e50;
-    --border-color: #dee2e6;
-    --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --primary-color: #4fc3f7;           /* 明るい水色 */
+    --primary-dark: #29b6f6;            /* 濃い水色 */
+    --secondary-color: #81c784;         /* 優しい緑 */
+    --accent-color: #ffb74d;            /* 温かいオレンジ */
+    --success-color: #66bb6a;           /* 成功の緑 */
+    --danger-color: #ef5350;            /* 優しい赤 */
+    --warning-color: #ffca28;           /* 警告の黄色 */
+    --info-color: #42a5f5;              /* 情報の青 */
+    --light-color: #fafafa;             /* ほぼ白 */
+    --white-color: #ffffff;             /* 純白 */
+    --light-bg: #f5f5f5;                /* 薄いグレー背景 */
+    --dark-color: #37474f;              /* 読みやすい濃いグレー */
+    --border-color: #e0e0e0;            /* 薄いボーダー */
+    --shadow-light: 0 2px 8px rgba(79, 195, 247, 0.15);  /* 水色の影 */
+    --shadow-medium: 0 4px 16px rgba(79, 195, 247, 0.2); /* 中程度の影 */
+    --border-radius: 12px;              /* 丸みのある角 */
+    --transition: all 0.3s ease;        /* スムーズなアニメーション */
 }
 
 /* 基本設定 */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--gradient-bg);
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Meiryo UI', sans-serif;
+    background: var(--white-color);
     min-height: 100vh;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    color: var(--dark-color);
+    line-height: 1.7;
+    font-size: 16px;
 }
 
-/* ホームページ - 1ページに収める */
+/* ホームページ - 明るく親しみやすく */
 .hero-section {
     height: 100vh;
     max-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
     color: white;
     text-align: center;
     padding: 20px 0;
@@ -38,104 +47,158 @@ body {
 
 .hero-section h1 {
     font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    font-size: 3rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-size: 3.5rem;
     margin-bottom: 20px;
+    letter-spacing: 0.02em;
 }
 
 .hero-section .lead {
-    font-size: 1.2rem;
-    opacity: 0.9;
-    margin-bottom: 30px;
+    font-size: 1.3rem;
+    opacity: 0.95;
+    margin-bottom: 40px;
+    font-weight: 400;
 }
 
 .features-section {
     display: none; /* デスクトップでは非表示にして1ページに収める */
 }
 
-/* 選択ページ - 1ページに収める */
+/* 選択ページ - 明るく親しみやすく */
 .selection-page {
-    height: 100vh;
-    padding: 30px 0;
-    color: white;
+    min-height: 100vh;
+    padding: 40px 0;
+    background: var(--light-bg);
     display: flex;
     align-items: center;
     box-sizing: border-box;
 }
 
 .selection-page .container {
-    background: rgba(255,255,255,0.95);
-    border-radius: 20px;
-    padding: 30px;
-    color: #333;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    background: var(--white-color);
+    border-radius: var(--border-radius);
+    padding: 40px;
+    color: var(--dark-color);
+    box-shadow: var(--shadow-medium);
     max-height: 90vh;
     overflow-y: auto;
 }
 
-/* 出席番号カード - コンパクト化 */
+/* 出席番号カード - 小学生に優しいデザイン */
 .number-card {
-    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
-    color: white;
-    border-radius: 12px;
-    padding: 20px 10px;
+    background: var(--white-color);
+    color: var(--dark-color);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 24px 16px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    height: 90px;
+    transition: var(--transition);
+    box-shadow: var(--shadow-light);
+    height: 100px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.number-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--primary-color);
+    transition: var(--transition);
 }
 
 .number-card:hover {
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-medium);
+    border-color: var(--primary-dark);
+}
+
+.number-card:hover::before {
+    height: 100%;
+    opacity: 0.1;
 }
 
 .number-card.active {
-    background: linear-gradient(135deg, var(--success-color), #27ae60);
-    transform: scale(1.05);
+    background: var(--primary-color);
+    color: var(--white-color);
+    border-color: var(--primary-dark);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-medium);
 }
 
 .number-display {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 2.2rem;
+    font-weight: 700;
     line-height: 1;
+    margin-bottom: 4px;
 }
 
 .number-label {
     font-size: 0.9rem;
-    opacity: 0.9;
+    opacity: 0.8;
+    font-weight: 500;
 }
 
-/* 単元カード - コンパクト化 */
+/* 単元カード - 親しみやすいデザイン */
 .unit-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px 15px;
+    background: var(--white-color);
+    border-radius: var(--border-radius);
+    padding: 24px 20px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    border: 2px solid transparent;
-    height: 140px;
+    transition: var(--transition);
+    box-shadow: var(--shadow-light);
+    border: 2px solid var(--border-color);
+    min-height: 150px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.unit-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    transition: var(--transition);
 }
 
 .unit-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
     border-color: var(--primary-color);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-medium);
+}
+
+.unit-card:hover::before {
+    height: 100%;
+    opacity: 0.08;
 }
 
 .unit-card.active {
     background: var(--primary-color);
-    color: white;
-    transform: translateY(-5px) scale(1.02);
+    color: var(--white-color);
+    border-color: var(--primary-dark);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-medium);
+}
+
+.unit-card h5 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.4;
 }
 
 .unit-icon {
@@ -155,22 +218,22 @@ body {
     font-size: 0.95rem;
 }
 
-/* チャットページ - 1ページに収める */
+/* チャットページ - 明るく読みやすく */
 .chat-page {
-    height: 100vh;
-    padding: 20px 0;
-    color: white;
+    min-height: 100vh;
+    padding: 30px 0;
+    background: var(--light-bg);
     display: flex;
     align-items: center;
     box-sizing: border-box;
 }
 
 .chat-page .container {
-    background: rgba(255,255,255,0.95);
-    border-radius: 20px;
-    padding: 20px;
-    color: #333;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    background: var(--white-color);
+    border-radius: var(--border-radius);
+    padding: 30px;
+    color: var(--dark-color);
+    box-shadow: var(--shadow-medium);
     height: 95vh;
     max-height: 95vh;
     display: flex;
@@ -178,62 +241,81 @@ body {
 }
 
 .chat-header h2 {
-    color: #333;
-    font-size: 1.8rem;
-    margin-bottom: 15px;
+    color: var(--dark-color);
+    font-size: 2rem;
+    margin-bottom: 20px;
+    font-weight: 700;
 }
 
 .unit-display .badge {
-    padding: 8px 16px;
+    padding: 10px 18px;
+    background: var(--primary-color);
+    color: var(--white-color);
+    border-radius: 20px;
+    font-weight: 600;
 }
 
-/* 課題セクション - コンパクト化 */
+/* 課題セクション - 親しみやすく */
 .task-card {
-    background: linear-gradient(135deg, #fff, #f8f9fa);
-    border-left: 4px solid var(--primary-color);
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 15px;
+    background: linear-gradient(135deg, var(--white-color), var(--light-color));
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: var(--shadow-light);
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.task-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary-color), var(--secondary-color));
 }
 
 .task-title {
-    color: var(--primary-color);
-    margin-bottom: 8px;
-    font-weight: 600;
-    font-size: 1rem;
+    color: var(--primary-dark);
+    margin-bottom: 12px;
+    font-weight: 700;
+    font-size: 1.2rem;
 }
 
 .task-content {
-    font-size: 0.95rem;
-    line-height: 1.4;
+    font-size: 1rem;
+    line-height: 1.6;
     margin: 0;
+    color: var(--dark-color);
 }
 
-/* チャットコンテナ - 高さ調整 */
+/* チャットコンテナ - 見やすく */
 .chat-container {
-    background: #f8f9fa;
-    border-radius: 15px;
+    background: var(--light-color);
+    border-radius: var(--border-radius);
     overflow: hidden;
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
+    border: 1px solid var(--border-color);
 }
 
 .chat-messages {
-    height: 300px;
-    max-height: 300px;
+    height: 350px;
+    max-height: 350px;
     overflow-y: auto;
-    padding: 15px;
-    background: white;
+    padding: 20px;
+    background: var(--white-color);
     flex: 1;
 }
 
 .message {
     display: flex;
-    margin-bottom: 15px;
-    animation: fadeIn 0.3s ease-in;
+    margin-bottom: 20px;
+    animation: fadeIn 0.4s ease-in;
 }
 
 @keyframes fadeIn {
@@ -595,24 +677,85 @@ body {
     background: linear-gradient(135deg, var(--info-color), #2980b9);
 }
 
-/* ボタンスタイル - コンパクト化 */
+/* ボタンスタイル - 小学生と教員に優しいデザイン */
 .btn {
-    border-radius: 20px;
-    padding: 10px 25px;
+    border-radius: var(--border-radius);
+    padding: 12px 24px;
     font-weight: 600;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     border: none;
-    font-size: 0.9rem;
+    font-size: 1rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-shadow: var(--shadow-light);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
 }
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-medium);
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: var(--white-color);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    color: var(--white-color);
+}
+
+.btn-secondary {
+    background: var(--secondary-color);
+    color: var(--white-color);
+}
+
+.btn-success {
+    background: var(--success-color);
+    color: var(--white-color);
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    box-shadow: none;
+}
+
+.btn-outline-primary:hover {
+    background: var(--primary-color);
+    color: var(--white-color);
 }
 
 .btn-lg {
-    padding: 12px 30px;
-    font-size: 1rem;
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    border-radius: 16px;
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.9rem;
 }
 
 /* 教員用スタイル - コンパクト化 */
